@@ -1,12 +1,12 @@
 # Kataflase Server
 
-Jalankan `npm ci` dari folder server. Siapkan PostgreSQL sesuai langkah di bawah, lalu jalankan `npm start`. Port bawaan adalah `3000` dan origin frontend bawaan adalah `http://localhost:5173`. Gunakan `PORT` dan `CLIENT_ORIGIN` di environment server untuk mengganti keduanya. Saat development, konfigurasi bisa dimuat dari `.env`.
+Jalankan semua perintah setup dari folder `server`. Pasang dependency dengan `npm ci`, salin `.env.example` menjadi `.env`, lalu isi `GEMINI_API_KEY` jika ingin memakai AI. Siapkan PostgreSQL sesuai langkah di bawah, jalankan migration, kemudian `npm start`. Port bawaan adalah `3000` dan origin frontend bawaan adalah `http://localhost:5173`. Gunakan `PORT` dan `CLIENT_ORIGIN` di environment server untuk mengganti keduanya.
 
 Express dan Socket.IO menggunakan port yang sama.
 
 ## PostgreSQL
 
-Gunakan `config/config.json` dari setup Sequelize CLI. Jika file itu belum ada, jalankan `npx sequelize-cli init:config` dari folder server. Isi bagian `development` dengan koneksi lokal dan set `dialect` ke `postgres`. Gunakan database yang terpisah untuk `test`. File konfigurasi lokal ini diabaikan oleh Git.
+Gunakan `config/config.json` bawaan Sequelize CLI. Isi bagian `development` dengan koneksi lokal dan set `dialect` ke `postgres`. Gunakan database yang terpisah untuk `test`. Saat deployment, konfigurasi `production` memakai `use_env_variable: "DATABASE_URL"` dan `dialect: "postgres"`. Atur `NODE_ENV=production`, `DATABASE_URL`, `CLIENT_ORIGIN`, dan `GEMINI_API_KEY` melalui environment hosting.
 
 Jalankan migration dari folder server setelah database tersedia.
 
@@ -135,7 +135,7 @@ Sebelum `RESULT`, kata pemain lain, identitas impostor, dan pilihan suara tidak 
 
 ### AI dan pemulihan ronde
 
-Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh nama variabel tersedia di `.env.example` pada root repository. Key tidak dikirim ke client. Kegagalan API, timeout lima detik, atau respons invalid memakai word bank. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
+Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Kegagalan API, timeout lima detik, atau respons invalid memakai word bank. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
 
 Ronde disimpan di tabel `Rounds` melalui migration. Jalankan `npx sequelize-cli db:migrate` sebelum menjalankan server setelah pembaruan ini. Startup memulihkan fase dan deadline yang tersimpan serta memproses fase yang sudah kedaluwarsa. Client tetap memanggil `room:resume` untuk menerima snapshot dan kata pribadi. Jika restart terjadi saat menunggu AI, status start dilepas sehingga host bisa mencoba lagi.
 

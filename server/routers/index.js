@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { getAvailableCategories } = require("../src/services/wordBank");
+const { getAvailableCategories } = require("../helpers/wordBank");
 
 router.get("/health", (_req, res) => {
   res.status(200).json({ data: { status: "ok" } });

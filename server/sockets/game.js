@@ -1,10 +1,10 @@
 const { randomUUID } = require("node:crypto");
 const { Room, RoomPlayer, Round, sequelize } = require("../models");
-const { generateWordPair } = require("../src/services/geminiService");
-const { getAvailableCategories, isValidCategory, getWordPairHash } = require("../src/services/wordBank");
-const { setupRound } = require("../src/game/shuffler");
-const { validateClue, validateVote } = require("../src/game/validator");
-const { calculateRoundResult } = require("../src/game/resultCalculator");
+const { generateWordPair } = require("../helpers/gemini");
+const { getAvailableCategories, isValidCategory, getWordPairHash } = require("../helpers/wordBank");
+const { setupRound } = require("../helpers/shuffler");
+const { validateClue, validateVote } = require("../helpers/validator");
+const { calculateRoundResult } = require("../helpers/resultCalculator");
 
 const DURATION = { WORD_REVEAL: 10000, CLUE: 30000, DISCUSSION: 60000, VOTING: 45000 };
 
