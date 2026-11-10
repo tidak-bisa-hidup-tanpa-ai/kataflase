@@ -1,0 +1,140 @@
+/**
+ * wordBank.js
+ * Word Bank Lokal sebagai fallback ketika Gemini API tidak tersedia.
+ * Digunakan saat AI timeout, error, atau respons tidak valid.
+ */
+
+// Daftar pasangan kata per kategori
+// Setiap pasangan: [wordA (mayoritas), wordB (impostor)]
+// Syarat: Dekat secara nuansa/fungsi, tapi bukan sinonim persis
+const WORD_BANK = {
+  makanan: [
+    { wordA: "Nasi Goreng", wordB: "Mie Goreng" },
+    { wordA: "Kopi", wordB: "Teh" },
+    { wordA: "Pizza", wordB: "Burger" },
+    { wordA: "Soto", wordB: "Bakso" },
+    { wordA: "Roti", wordB: "Kue" },
+    { wordA: "Es Krim", wordB: "Pudding" },
+  ],
+  hewan: [
+    { wordA: "Kucing", wordB: "Anjing" },
+    { wordA: "Singa", wordB: "Harimau" },
+    { wordA: "Lumba-lumba", wordB: "Paus" },
+    { wordA: "Elang", wordB: "Gagak" },
+    { wordA: "Kuda", wordB: "Zebra" },
+    { wordA: "Kelinci", wordB: "Hamster" },
+  ],
+  teknologi: [
+    { wordA: "Laptop", wordB: "Tablet" },
+    { wordA: "Keyboard", wordB: "Mouse" },
+    { wordA: "Instagram", wordB: "TikTok" },
+    { wordA: "Lift", wordB: "Eskalator" },
+    { wordA: "Charger", wordB: "Power Bank" },
+    { wordA: "Headphone", wordB: "Earphone" },
+  ],
+  olahraga: [
+    { wordA: "Sepak Bola", wordB: "Futsal" },
+    { wordA: "Basket", wordB: "Voli" },
+    { wordA: "Renang", wordB: "Selam" },
+    { wordA: "Tenis", wordB: "Badminton" },
+    { wordA: "Lari", wordB: "Jalan Cepat" },
+    { wordA: "Tinju", wordB: "Gulat" },
+  ],
+  transportasi: [
+    { wordA: "Kereta", wordB: "Bus" },
+    { wordA: "Pesawat", wordB: "Helikopter" },
+    { wordA: "Motor", wordB: "Sepeda" },
+    { wordA: "Kapal", wordB: "Feri" },
+    { wordA: "Taksi", wordB: "Ojek" },
+    { wordA: "MRT", wordB: "LRT" },
+  ],
+  acak: [], // Dikosongkan, diisi saat runtime dari semua kategori
+};
+
+// Daftar kategori yang tersedia untuk dipilih oleh host
+const AVAILABLE_CATEGORIES = [
+  "makanan",
+  "hewan",
+  "teknologi",
+  "olahraga",
+  "transportasi",
+  "acak",
+];
+
+/**
+ * Mengambil satu pasangan kata secara acak dari kategori tertentu.
+ * Menghindari pengulangan pasangan dari ronde sebelumnya.
+ *
+ * @param {string} category - Kategori yang dipilih host (misal: "makanan", "acak")
+ * @param {{ wordA: string, wordB: string } | null} previousPair - Pasangan kata ronde sebelumnya
+ * @returns {{ wordA: string, wordB: string }} Pasangan kata yang terpilih
+ */
+function getRandomWordPair(category, previousPair = null) {
+  let pool;
+
+  if (category === "acak") {
+    // Gabungkan semua pasangan dari semua kategori (kecuali "acak" itu sendiri)
+    pool = Object.entries(WORD_BANK)
+      .filter(([key]) => key !== "acak")
+      .flatMap(([, pairs]) => pairs);
+  } else {
+    pool = WORD_BANK[category] || [];
+  }
+
+  if (pool.length === 0) {
+    throw new Error(`Kategori tidak dikenali atau kosong: ${category}`);
+  }
+
+  // Filter pasangan yang sama dengan ronde sebelumnya (juga cek urutan terbalik)
+  let candidates = pool;
+  if (previousPair) {
+    candidates = pool.filter(
+      (pair) =>
+        !(
+          (pair.wordA === previousPair.wordA &&
+            pair.wordB === previousPair.wordB) ||
+          (pair.wordA === previousPair.wordB &&
+            pair.wordB === previousPair.wordA)
+        )
+    );
+
+    // Jika setelah filter tidak ada kandidat tersisa (pool sangat kecil),
+    // kembali pakai seluruh pool agar game tidak stuck
+    if (candidates.length === 0) {
+      console.warn(
+        "[WordBank] Semua pasangan sudah dipakai, mengulang dari pool penuh."
+      );
+      candidates = pool;
+    }
+  }
+
+  // Pilih satu pasangan secara acak dari kandidat yang tersisa
+  const randomIndex = Math.floor(Math.random() * candidates.length);
+  return candidates[randomIndex];
+}
+
+/**
+ * Mengembalikan daftar kategori yang tersedia untuk ditampilkan di lobby.
+ * @returns {string[]}
+ */
+function getAvailableCategories() {
+  return AVAILABLE_CATEGORIES;
+}
+
+/**
+ * Memvalidasi apakah kategori yang dikirim client adalah kategori yang sah.
+ * @param {string} category
+ * @returns {boolean}
+ */
+function isValidCategory(category) {
+  return AVAILABLE_CATEGORIES.includes(category);
+}
+
+module.exports = {
+  getRandomWordPair,
+  getAvailableCategories,
+  isValidCategory,
+  WORD_BANK,
+  AVAILABLE_CATEGORIES,
+};
+
