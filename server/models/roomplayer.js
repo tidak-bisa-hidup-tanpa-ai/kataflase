@@ -24,6 +24,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       unique: true,
     },
+    disconnectExpiresAt: DataTypes.DATE,
   }, {
     sequelize,
     modelName: "RoomPlayer",
