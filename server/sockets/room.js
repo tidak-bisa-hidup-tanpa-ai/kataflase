@@ -1,5 +1,6 @@
 const { createHash, randomBytes } = require("node:crypto");
-const { Room, RoomPlayer, sequelize } = require("../models");
+const { Room, RoomPlayer, Round, sequelize } = require("../models");
+const createGameEvents = require("./game");
 
 const LOBBY_GRACE_MS = 30000;
 
@@ -31,7 +32,16 @@ function clearRoomBinding(socket) {
   delete socket.data.playerId;
 }
 
-function emitRoomState(io, room, players) {
+async function emitRoomState(io, previousRoom) {
+  const state = await sequelize.transaction(async (transaction) => {
+    const room = await Room.findByPk(previousRoom.id, { lock: transaction.LOCK.UPDATE, transaction });
+    if (!room) return;
+    const players = await findRoomPlayers(room.id, transaction);
+    const round = await Round.findOne({ where: { roomId: room.id }, transaction });
+    return { room, players, round };
+  });
+  if (!state) return;
+  const { room, players, round } = state;
   const channel = `room:${room.code}`;
   const onlinePlayerIds = getOnlinePlayerIds(io, channel);
 
@@ -46,7 +56,27 @@ function emitRoomState(io, room, players) {
       nickname: member.nickname,
       online: onlinePlayerIds.has(member.id),
     })),
+    roundId: round?.id ?? null,
+    category: round?.category ?? null,
+    source: round?.source ?? null,
+    participants: round?.players ?? [],
+    turnOrder: round?.turnOrder ?? [],
+    currentTurnPlayerId: room.phase === "CLUE" ? round?.turnOrder[round.turnIndex] ?? null : null,
+    deadlineAt: round?.deadlineAt?.toISOString() ?? null,
+    clues: round?.clues ?? [],
+    chat: round?.chat ?? [],
+    voting: { submitted: Object.keys(round?.votes ?? {}).length, total: round?.players.length ?? 0 },
+    result: room.phase === "RESULT" ? round?.result ?? null : null,
   });
+  for (const client of getRoomSockets(io, channel)) {
+    if (!players.some((member) => member.id === client.data.playerId)) continue;
+    client.emit("player:state", {
+      roundId: round?.id ?? null,
+      word: round?.playerWords[client.data.playerId] ?? null,
+      hasVoted: Object.hasOwn(round?.votes ?? {}, client.data.playerId),
+    });
+  }
+  return state;
 }
 
 async function enterRoom(io, socket, payload, acknowledge, action) {
@@ -143,7 +173,7 @@ async function enterRoom(io, socket, payload, acknowledge, action) {
       const hostId = onlinePlayerIds.has(room.hostId)
         ? room.hostId
         : players.find((member) => onlinePlayerIds.has(member.id))?.id ?? null;
-      await room.update({ hostId, revision: room.revision + 1 }, { transaction });
+      await room.update({ hostId, isStarting: false, revision: room.revision + 1 }, { transaction });
 
       return { room, player, players };
     });
@@ -152,8 +182,8 @@ async function enterRoom(io, socket, payload, acknowledge, action) {
 
     const { room, player, players } = result;
     if (replacement) replacement.socket.disconnect();
+    await emitRoomState(io, room);
     acknowledge({ ok: true, data: { code: room.code, playerId: player.id, sessionToken } });
-    emitRoomState(io, room, players);
   } catch (error) {
     if (!result && channel && !previousPlayerId) {
       await socket.leave(channel);
@@ -209,7 +239,7 @@ async function changePresence(io, code, playerId, action, socket) {
       ? players.find((member) => onlinePlayerIds.has(member.id))?.id ?? null
       : room.hostId;
 
-    await room.update({ hostId, revision: room.revision + 1 }, { transaction });
+    await room.update({ hostId, isStarting: false, revision: room.revision + 1 }, { transaction });
     return { room, players, disconnectExpiresAt };
   });
 }
@@ -224,7 +254,7 @@ async function updateDisconnectedPlayer(io, code, playerId, action = "disconnect
     const result = await changePresence(io, code, playerId, action);
     if (!result) return;
 
-    emitRoomState(io, result.room, result.players);
+    await emitRoomState(io, result.room);
     if (result.disconnectExpiresAt) {
       scheduleExpiry(io, code, playerId, result.disconnectExpiresAt);
     }
@@ -252,8 +282,8 @@ async function leaveRoom(io, socket, acknowledge) {
     if (result?.error) return acknowledge(result);
     await socket.leave(`room:${roomCode}`);
     clearRoomBinding(socket);
+    if (result) await emitRoomState(io, result.room);
     acknowledge({ ok: true });
-    if (result) emitRoomState(io, result.room, result.players);
   } catch (error) {
     acknowledge(failure("INTERNAL_SERVER_ERROR", "Gagal keluar dari room."));
     console.error("Room leave failed:", error.name);
@@ -287,8 +317,11 @@ async function restoreLobbyReservations(io) {
 }
 
 module.exports = async (io) => {
+  const game = createGameEvents(io, { emitRoomState, getOnlinePlayerIds, scheduleExpiry });
+  await game.restore();
   await restoreLobbyReservations(io);
   io.on("connection", (socket) => {
+    game.register(socket);
     socket.on("room:create", (payload, acknowledge) => {
       return enterRoom(io, socket, payload, acknowledge, "create");
     });

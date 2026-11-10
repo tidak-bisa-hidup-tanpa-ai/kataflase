@@ -15,7 +15,8 @@
     "express": "^5.3.0",
     "pg": "^8.23.1",
     "sequelize": "^6.37.8",
-    "socket.io": "^4.8.4"
+    "socket.io": "^4.8.4",
+    "@google/generative-ai": "^0.24.1"
   },
   "devDependencies": {
     "sequelize-cli": "^6.6.5"

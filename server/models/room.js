@@ -3,6 +3,7 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class Room extends Model {
     static associate(models) {
+      Room.hasOne(models.Round, { foreignKey: "roomId", onDelete: "CASCADE" });
       Room.hasMany(models.RoomPlayer, {
         foreignKey: "roomId",
         onDelete: "CASCADE",
