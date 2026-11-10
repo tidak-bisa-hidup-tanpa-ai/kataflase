@@ -28,14 +28,15 @@ Memeriksa bahwa server HTTP dapat merespons. Respons HTTP `200 OK`.
 
 ## Socket.IO lobby
 
-Kirim callback ACK saat memanggil kedua event.
+Kirim callback ACK saat memanggil event lobby.
 
 | Event | Payload | Hasil |
 | --- | --- | --- |
 | `room:create` | `{ "nickname": "Ari" }` | Membuat room dan menjadikan pemain pertama sebagai host. |
 | `room:join` | `{ "code": "A3D19F", "nickname": "Citra" }` | Bergabung ke lobby dengan maksimal enam pemain. Kode dapat ditulis dengan huruf kecil atau besar. |
+| `room:leave` | Callback ACK saja | Mengakhiri sesi room pada koneksi ini dan langsung melepas slot pemain. ACK sukses berisi `{ "ok": true }`. |
 
-ACK sukses hanya dikirim ke socket yang meminta.
+ACK sukses untuk create atau join hanya dikirim ke socket yang meminta.
 
 ```json
 {
@@ -48,9 +49,11 @@ ACK sukses hanya dikirim ke socket yang meminta.
 }
 ```
 
-ACK gagal memakai `{ "ok": false, "error": { "code": "ROOM_FULL", "message": "Room sudah penuh." } }`. Kode lain yang dapat diterima adalah `INVALID_NICKNAME`, `INVALID_ROOM_CODE`, `ALREADY_IN_ROOM`, `ROOM_NOT_FOUND`, `ROUND_IN_PROGRESS`, dan `INTERNAL_SERVER_ERROR`.
+ACK gagal memakai `{ "ok": false, "error": { "code": "ROOM_FULL", "message": "Room sudah penuh." } }`. Kode lain yang dapat diterima adalah `INVALID_NICKNAME`, `INVALID_ROOM_CODE`, `ALREADY_IN_ROOM`, `ROOM_NOT_FOUND`, `ROUND_IN_PROGRESS`, `NOT_IN_ROOM`, dan `INTERNAL_SERVER_ERROR`.
 
-Setelah create atau join berhasil, server mengirim `room:state` ke anggota room tersebut. `online` menunjukkan status koneksi saat snapshot dibuat.
+Server mengirim `room:state` ke anggota room setelah create, join, leave, atau pembaruan presence. `online` menunjukkan status koneksi saat snapshot dibuat.
+
+Saat koneksi putus di lobby, pemain ditandai offline. Server menahan slot selama 30 detik, lalu melepasnya jika pemain masih offline dan room masih di fase `WAITING`. Saat ronde berjalan, pemain offline tetap tercatat. Jika host keluar atau putus koneksi, pemain online yang paling awal bergabung mengambil alih. Saat semua pemain offline, room tetap ada dan pemain online berikutnya dapat menjadi host.
 
 ```json
 {
