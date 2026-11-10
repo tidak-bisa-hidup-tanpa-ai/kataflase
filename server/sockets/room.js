@@ -175,12 +175,12 @@ async function enterRoom(io, socket, payload, acknowledge, action) {
         : players.find((member) => onlinePlayerIds.has(member.id))?.id ?? null;
       await room.update({ hostId, isStarting: false, revision: room.revision + 1 }, { transaction });
 
-      return { room, player, players };
+      return { room, player };
     });
 
     if (result.error) return acknowledge(result);
 
-    const { room, player, players } = result;
+    const { room, player } = result;
     if (replacement) replacement.socket.disconnect();
     await emitRoomState(io, room);
     acknowledge({ ok: true, data: { code: room.code, playerId: player.id, sessionToken } });
@@ -240,7 +240,7 @@ async function changePresence(io, code, playerId, action, socket) {
       : room.hostId;
 
     await room.update({ hostId, isStarting: false, revision: room.revision + 1 }, { transaction });
-    return { room, players, disconnectExpiresAt };
+    return { room, disconnectExpiresAt };
   });
 }
 

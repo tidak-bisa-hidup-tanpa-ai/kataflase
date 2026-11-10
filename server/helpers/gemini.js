@@ -1,5 +1,5 @@
 /**
- * geminiService.js
+ * gemini.js
  * Modul pemanggil Gemini API untuk menghasilkan pasangan kata rahasia.
  *
  * Bertanggung jawab atas:
@@ -10,7 +10,6 @@
  * 5. Fallback ke word bank lokal jika AI gagal, timeout, atau invalid
  */
 
-require("dotenv").config({ quiet: true });
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { getRandomWordPair, getWordPairHash } = require("./wordBank");
 
@@ -127,7 +126,7 @@ function parseAndValidateResponse(rawText, previousPair = null) {
 }
 
 /**
- * Fungsi utama yang dipakai oleh roundManager.
+ * Fungsi utama yang dipanggil saat game:start menyiapkan ronde.
  * Mencoba memanggil Gemini API, lalu otomatis fallback ke word bank lokal
  * jika terjadi error apapun (timeout, invalid JSON, kata tidak valid, dsb).
  *
