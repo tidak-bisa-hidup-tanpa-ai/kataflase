@@ -9,11 +9,7 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: app.get("client origin") },
 });
-registerRoomEvents(io).then(() => {
-  httpServer.listen(port, () => {
-    console.log(`Kataflase server listening on port ${httpServer.address().port}`);
-  });
-}).catch((error) => {
-  console.error("Kataflase server could not restore room sessions:", error.name);
-  process.exit(1);
+registerRoomEvents(io);
+httpServer.listen(port, () => {
+  console.log(`Kataflase server listening on port ${httpServer.address().port}`);
 });

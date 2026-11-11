@@ -34,30 +34,21 @@ function validateClue(clueText, secretWord) {
     return { valid: false, reason: "Petunjuk terlalu panjang (maksimal 100 karakter)." };
   }
 
-  // Normalisasi teks untuk deteksi penyebutan kata rahasia:
-  // Ubah ke lowercase dan hilangkan tanda baca (titik, koma, tanda seru, dll)
-  const cleanClue = trimmedClue
-    .toLowerCase()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "");
+  if (typeof secretWord !== "string") {
+    return { valid: false, reason: "Kata rahasia tidak tersedia." };
+  }
+  const cleanClue = trimmedClue.normalize("NFKC").toLowerCase();
+  const wordParts = secretWord.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  if (!wordParts.length) return { valid: false, reason: "Kata rahasia tidak tersedia." };
 
-  const cleanWord = secretWord
-    .toLowerCase()
-    .trim()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "");
-
-  // Pecah kata rahasia jika terdiri dari beberapa kata (misal: "Nasi Goreng" -> ["nasi", "goreng"])
-  const wordParts = cleanWord.split(/\s+/).filter(Boolean);
-
-  // Pecah clue menjadi daftar kata
-  const clueWords = cleanClue.split(/\s+/).filter(Boolean);
-
-  // Periksa apakah salah satu bagian kata rahasia persis disebut di dalam petunjuk
   for (const part of wordParts) {
-    // Cek kecocokan kata utuh (agar kata "es" tidak salah mendeteksi "eskalator")
-    if (clueWords.includes(part)) {
+    const letters = [...part].join("[^\\p{L}\\p{N}]*");
+    // Batas kata mencegah "es" menolak "eskalator", sambil menangkap "k o p i".
+    const literalWord = new RegExp(`(?:^|[^\\p{L}\\p{N}])${letters}(?=$|[^\\p{L}\\p{N}])`, "u");
+    if (literalWord.test(cleanClue)) {
       return {
         valid: false,
-        reason: "Dilarang menyebutkan kata rahasia milikmu sendiri dalam petunjuk!",
+        reason: "Dilarang menyamarkan atau menyebutkan kata rahasia milikmu sendiri!",
       };
     }
   }
@@ -77,11 +68,11 @@ function validateClue(clueText, secretWord) {
  * @param {string} params.voterId - ID pemain yang memberikan suara
  * @param {string} params.targetPlayerId - ID pemain yang divote
  * @param {Array<{ playerId: string }>} params.activePlayers - Daftar pemain resmi dalam ronde
- * @param {boolean} params.hasVoted - Status apakah pemilih sudah pernah memilih di ronde ini
+ * @param {Record<string, number>} params.votes - Suara yang sudah diterima dalam ronde
  * @returns {{ valid: boolean, reason?: string }}
  */
-function validateVote({ voterId, targetPlayerId, activePlayers, hasVoted }) {
-  if (hasVoted) {
+function validateVote({ voterId, targetPlayerId, activePlayers, votes }) {
+  if (Object.hasOwn(votes || {}, voterId)) {
     return { valid: false, code: "ALREADY_VOTED", reason: "Kamu sudah memberikan suara di ronde ini." };
   }
 
@@ -89,7 +80,8 @@ function validateVote({ voterId, targetPlayerId, activePlayers, hasVoted }) {
     return { valid: false, code: "CANNOT_VOTE_SELF", reason: "Kamu tidak boleh memilih dirimu sendiri." };
   }
 
-  const isTargetValid = activePlayers.some((p) => p.playerId === targetPlayerId);
+  const isTargetValid = Array.isArray(activePlayers)
+    && activePlayers.some((p) => p.playerId === targetPlayerId);
   if (!isTargetValid) {
     return { valid: false, code: "INVALID_TARGET", reason: "Pemain yang kamu pilih tidak terdaftar di ronde ini." };
   }
