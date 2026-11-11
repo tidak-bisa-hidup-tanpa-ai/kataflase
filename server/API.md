@@ -86,11 +86,12 @@ Semua aksi memerlukan callback ACK. Identitas pemain diambil dari sesi socket; j
 | --- | --- | --- |
 | `game:start` | `{ "category": "makanan" }` | Host memulai ronde ketika 3–6 anggota online. Jika kategori tidak dikirim, gunakan `acak`. Untuk kategori sendiri, kirim `{ "category": "custom", "customCategory": "Futsal" }` dengan nama 1–50 karakter dalam satu baris. ACK sukses: `{ "ok": true, "data": { "roundId": "<uuid>" } }`. |
 | `clue:submit` | `{ "roundId": "<uuid>", "text": "Hangat" }` | Satu clue, maksimal 100 karakter, pada giliran sendiri. Kata sendiri atau bagiannya yang dipisah spasi/simbol, seperti `k o p i` dan `k.o.p.i`, ditolak. |
+| `clue:hint` | `{ "roundId": "<uuid>" }` | Saat giliran sendiri, minta saran yang hanya dikembalikan lewat ACK privat `{ "ok": true, "data": { "hint": "aroma pagi", "source": "ai" } }`. Hasil dipakai ulang pada giliran yang sama. Jika Gemini gagal, sumbernya `fallback`. Jika tidak ada saran yang lolos validasi, kode penolakan `HINT_UNAVAILABLE`. |
 | `chat:send` | `{ "roundId": "<uuid>", "text": "Menurutku Ari" }` | Pesan 1–500 karakter selama `DISCUSSION`. Riwayat menyimpan 50 pesan terakhir. |
 | `vote:submit` | `{ "roundId": "<uuid>", "targetPlayerId": 2 }` | Target memakai ID angka dari daftar peserta. Satu suara terkunci; tidak boleh memilih diri sendiri. |
 | `game:restart` | `{ "roundId": "<uuid>" }` | Host kembali dari `RESULT` ke `WAITING`, menghapus data ronde, mempertahankan kode room dan sesi anggota. |
 
-ACK sukses selain start: `{ "ok": true }`. ACK gagal mengikuti format lobby. Kode game meliputi `HOST_ONLY`, `PLAYERS_NOT_READY`, `INVALID_CATEGORY`, `INVALID_CUSTOM_CATEGORY`, `CUSTOM_CATEGORY_UNAVAILABLE`, `ROUND_IN_PROGRESS`, `START_CANCELLED`, `INVALID_ROUND`, `NOT_A_PARTICIPANT`, `INVALID_PHASE`, `ACTION_EXPIRED`, `NOT_YOUR_TURN`, `ALREADY_SUBMITTED`, `INVALID_CLUE`, `INVALID_MESSAGE`, `ALREADY_VOTED`, `CANNOT_VOTE_SELF`, dan `INVALID_TARGET`.
+ACK sukses selain `game:start` dan `clue:hint`: `{ "ok": true }`. ACK gagal mengikuti format lobby. Kode game meliputi `HOST_ONLY`, `PLAYERS_NOT_READY`, `INVALID_CATEGORY`, `INVALID_CUSTOM_CATEGORY`, `CUSTOM_CATEGORY_UNAVAILABLE`, `ROUND_IN_PROGRESS`, `START_CANCELLED`, `INVALID_ROUND`, `NOT_A_PARTICIPANT`, `INVALID_PHASE`, `ACTION_EXPIRED`, `NOT_YOUR_TURN`, `ALREADY_SUBMITTED`, `INVALID_CLUE`, `INVALID_MESSAGE`, `ALREADY_VOTED`, `CANNOT_VOTE_SELF`, dan `INVALID_TARGET`.
 
 Fase berjalan otomatis: `WAITING` → `WORD_REVEAL` (10 detik) → `CLUE` (30 detik per pemain) → `DISCUSSION` (60 detik) → `VOTING` (45 detik) → `RESULT`. Clue yang melewati waktu dicatat dengan `text: null` dan `skipped: true`. Voting selesai lebih cepat jika seluruh peserta sudah memilih. Yang belum memilih saat waktu habis dianggap abstain. Impostor kalah hanya jika menjadi satu-satunya kandidat dengan suara terbanyak.
 
@@ -129,6 +130,8 @@ Fase berjalan otomatis: `WAITING` → `WORD_REVEAL` (10 detik) → `CLUE` (30 de
 Client mencocokkan `roundId` sebelum menampilkan kata. Saat kembali ke lobby, server mengirim `roundId: null`, `word: null`, dan `hasVoted: false` untuk membersihkan tampilan privat.
 
 Sebelum `RESULT`, kata pemain lain, identitas impostor, dan pilihan suara tidak dikirim dalam snapshot publik. Pada `RESULT`, `result` berisi `winner` (`CIVILIANS` atau `IMPOSTOR`), `impostorId`, `voteTally`, `highestVoteCount`, `topCandidates`, `reason`, dan `playerWords`.
+
+Setelah hasil dikirim, server menambahkan `result.recap` dengan bentuk `{ "recap": "...", "source": "ai" }` atau sumber `fallback`. Hasil voting dan tombol main lagi tersedia selama ulasan diproses.
 
 ### AI dan siklus ronde
 

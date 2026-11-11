@@ -7,7 +7,8 @@ const cors = require("cors");
 const router = require("./routers");
 const app = express();
 
-app.set("client origin", process.env.CLIENT_ORIGIN || "http://localhost:5173");
+const clientOrigin = process.env.CLIENT_ORIGIN?.trim().replace(/\/+$/, "") || "http://localhost:5173";
+app.set("client origin", clientOrigin);
 app.use(cors({ origin: app.get("client origin") }));
 app.use(express.json());
 

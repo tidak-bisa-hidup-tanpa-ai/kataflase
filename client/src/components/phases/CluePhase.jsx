@@ -7,11 +7,14 @@ import { toast } from '../../helpers/toast'
 import ClueList from '../room/ClueList'
 import PhaseBar from '../room/PhaseBar'
 import Avatar from '../ui/Avatar'
+import Mascot from '../ui/Mascot'
 
 export default function CluePhase() {
-  const { room, playerId, myWord, submitClue, canAct } = useGame()
+  const { room, playerId, myWord, submitClue, requestClueHint, canAct } = useGame()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [hint, setHint] = useState('')
+  const [hintBusy, setHintBusy] = useState(false)
 
   const order = room.turnOrder ?? []
   const currentId = room.currentTurnPlayerId
@@ -24,6 +27,14 @@ export default function CluePhase() {
     : currentId
       ? `Giliran ${playerName(room, currentId)}`
       : 'Petunjuk'
+
+  async function onRequestHint() {
+    setHintBusy(true)
+    const res = await requestClueHint()
+    setHintBusy(false)
+    if (res.ok) setHint(res.data.hint)
+    else toast(errorMessage(res), 'error')
+  }
 
   async function onSubmit(event) {
     event.preventDefault()
@@ -48,7 +59,7 @@ export default function CluePhase() {
   }
 
   return (
-    <div className={isMyTurn ? 'pb-56 lg:pb-6' : 'pb-6'}>
+    <div className={isMyTurn ? 'pb-64 lg:pb-6' : 'pb-6'}>
       <PhaseBar title={title} barColor="bg-flame" />
 
       <div className={isMyTurn ? 'lg:mt-2 lg:grid lg:grid-cols-[1fr_24rem] lg:items-start lg:gap-10' : ''}>
@@ -76,7 +87,8 @@ export default function CluePhase() {
       <h2 className="label mt-6">Petunjuk masuk</h2>
       <ClueList variant="list" />
       {isParticipant && !submitted.has(playerId) && (
-        <p className="mt-2 rounded-xl border-2 border-dashed border-ink/50 py-3 text-center font-mono text-[11px] text-muted">
+        <p className="mt-2 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink/50 py-2 text-center font-mono text-[11px] text-muted">
+          <Mascot mood={isMyTurn ? 'happy' : 'peek'} className="w-10" />
           {isMyTurn ? 'Petunjukmu muncul di sini' : 'Tunggu giliranmu'}
         </p>
       )}
@@ -101,13 +113,26 @@ export default function CluePhase() {
               autoComplete="off"
               autoFocus
             />
-            <button
-              type="submit"
-              className="btn btn-sun mt-3 w-full shadow-none"
-              disabled={busy || !canAct || !text.trim()}
-            >
-              {busy ? 'Mengirim…' : 'Kirim Petunjuk'}
-            </button>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="btn btn-outline px-2 text-sm"
+                onClick={onRequestHint}
+                disabled={hintBusy || busy || !canAct || Boolean(hint)}
+              >
+                {hintBusy ? 'Mencari…' : 'Minta Saran'}
+              </button>
+              <button
+                type="submit"
+                className="btn btn-sun px-2 text-sm shadow-none"
+                disabled={busy || !canAct || !text.trim()}
+              >
+                {busy ? 'Mengirim…' : 'Kirim Petunjuk'}
+              </button>
+            </div>
+            <div role="status">
+              {hint && <p className="mt-2 text-sm text-card">Saran pribadi: {hint}</p>}
+            </div>
             <p className="mt-2 text-center text-[11px] text-card/80">
               Jangan tulis kata rahasiamu secara langsung · {text.length}/{CLUE_MAX}
             </p>

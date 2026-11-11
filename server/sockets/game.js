@@ -1,5 +1,5 @@
 const { randomUUID } = require("node:crypto");
-const { generateWordPair } = require("../helpers/gemini");
+const { generateWordPair, generateClueHint, generateMatchRecap } = require("../helpers/gemini");
 const { getAvailableCategories, isValidCategory, getWordPairHash } = require("../helpers/wordBank");
 const { setupRound } = require("../helpers/shuffler");
 const { validateClue, validateVote } = require("../helpers/validator");
@@ -22,6 +22,7 @@ function finishRound(room, round) {
 
 function nextClue(room, round, now) {
   round.turnIndex += 1;
+  round.hint = null;
   room.phase = round.turnIndex < round.turnOrder.length ? "CLUE" : "DISCUSSION";
   round.deadlineAt = new Date(now + DURATION[room.phase]);
 }
@@ -59,11 +60,38 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
     timers.delete(code);
   }
 
+  async function publishRecap(room, round) {
+    const { result, players, clues } = round;
+    const impostor = players.find(({ playerId }) => playerId === result.impostorId);
+    const civilian = players.find(({ playerId }) => playerId !== result.impostorId);
+    const recap = await generateMatchRecap({
+      winner: result.winner,
+      impostorNickname: impostor.nickname,
+      impostorWord: result.playerWords[impostor.playerId],
+      majorityWord: result.playerWords[civilian.playerId],
+      reason: result.reason,
+      clues: clues.filter(({ skipped }) => !skipped).map(({ playerId, text }) => ({
+        nickname: players.find((player) => player.playerId === playerId)?.nickname, text,
+      })),
+    });
+    if (rooms.get(room.code) !== room || room.round !== round) return;
+    result.recap = recap;
+    room.revision += 1;
+    emitRoomState(io, room);
+  }
+
   function publish(room) {
     const state = emitRoomState(io, room);
     clearRoundTimer(room.code);
     const { round } = state;
-    if (!round?.deadlineAt || room.phase === "RESULT") return;
+    if (room.phase === "RESULT") {
+      if (round.result.recap === undefined) {
+        round.result.recap = null;
+        publishRecap(room, round).catch((error) => console.error("Game recap failed:", error.name));
+      }
+      return;
+    }
+    if (!round?.deadlineAt) return;
 
     const roundId = round.id;
     const deadline = round.deadlineAt.getTime();
@@ -177,7 +205,7 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
     }
   }
 
-  function act(socket, payload, acknowledge, action) {
+  async function act(socket, payload, acknowledge, action) {
     if (typeof acknowledge !== "function") return;
     let affectedRoom;
     try {
@@ -210,14 +238,26 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
           }
           return { ok: true };
         }
-        const expectedPhase = { clue: "CLUE", chat: "DISCUSSION", vote: "VOTING" }[action];
+        const expectedPhase = { clue: "CLUE", hint: "CLUE", chat: "DISCUSSION", vote: "VOTING" }[action];
         if (room.phase !== expectedPhase) return failure("INVALID_PHASE", "Aksi tidak tersedia pada fase ini.");
-        if (action === "clue") {
+        if (action === "clue" || action === "hint") {
           if (round.turnOrder[round.turnIndex] !== playerId) {
             return failure("NOT_YOUR_TURN", "Sekarang bukan giliranmu.");
           }
           if (round.clues.some((clue) => clue.playerId === playerId)) {
             return failure("ALREADY_SUBMITTED", "Petunjuk sudah diterima.");
+          }
+          if (action === "hint") {
+            round.hint ??= generateClueHint(round.playerWords[playerId], round.category);
+            return round.hint.then((data) => withPlayer(socket, (current, currentId) => {
+              if (current !== room || currentId !== playerId || room.round !== round
+                || room.phase !== "CLUE" || round.turnIndex !== turnBefore
+                || round.deadlineAt.getTime() <= Date.now()) {
+                return failure("ACTION_EXPIRED", "Batas waktu meminta saran sudah berakhir.");
+              }
+              if (!data.hint) return failure("HINT_UNAVAILABLE", "Saran petunjuk belum tersedia.");
+              return { ok: true, data };
+            }));
           }
           const validation = validateClue(payload.text, round.playerWords[playerId]);
           if (!validation.valid) return failure("INVALID_CLUE", validation.reason);
@@ -242,7 +282,7 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
         return { ok: true };
       });
       if (affectedRoom) publish(affectedRoom);
-      acknowledge(result);
+      acknowledge(await result);
     } catch (error) {
       acknowledge(failure("INTERNAL_SERVER_ERROR", "Gagal memproses aksi permainan."));
       console.error("Game action failed:", error.name);
@@ -254,7 +294,8 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
     register(socket) {
       socket.on("game:start", (payload, acknowledge) => start(socket, payload, acknowledge));
       for (const [event, action] of Object.entries({
-        "clue:submit": "clue", "chat:send": "chat", "vote:submit": "vote", "game:restart": "restart",
+        "clue:submit": "clue", "clue:hint": "hint", "chat:send": "chat",
+        "vote:submit": "vote", "game:restart": "restart",
       })) {
         socket.on(event, (payload, acknowledge) => act(socket, payload, acknowledge, action));
       }

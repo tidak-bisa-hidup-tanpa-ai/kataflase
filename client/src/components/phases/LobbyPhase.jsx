@@ -7,6 +7,7 @@ import { SERVER_URL } from '../../constant/url'
 import { toast } from '../../helpers/toast'
 import LeaveRoomButton from '../room/LeaveRoomButton'
 import AppHeader from '../AppHeader'
+import Mascot from '../ui/Mascot'
 import PlayerList from '../room/PlayerList'
 import RoomHeader from '../room/RoomHeader'
 
@@ -119,10 +120,13 @@ export default function LobbyPhase() {
         </section>
       )}
 
-      <p className="mt-5 text-[13px] leading-relaxed">
-        Tiap pemain dapat satu kata pribadi, satu orang dapat kata berbeda. Beri satu petunjuk
-        singkat, diskusi, lalu vote.
-      </p>
+      <div className="mt-5 flex items-center gap-3">
+        <Mascot mood="wave" className="w-16 shrink-0 motion-safe:animate-bob lg:w-20" />
+        <p className="text-[13px] leading-relaxed">
+          Tiap pemain dapat satu kata pribadi, satu orang dapat kata berbeda. Beri satu petunjuk
+          singkat, diskusi, lalu vote.
+        </p>
+      </div>
 
       {isHost ? (
         <button
@@ -134,7 +138,8 @@ export default function LobbyPhase() {
           {busy || room.isStarting ? 'Menyiapkan ronde…' : 'Mulai Ronde'}
         </button>
       ) : (
-        <p className="mt-5 rounded-xl border-2 border-dashed border-ink/45 py-3 text-center text-sm font-semibold">
+        <p className="mt-5 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink/45 py-2 text-center text-sm font-semibold">
+          <Mascot mood="sleepy" className="w-10" />
           Menunggu host memulai ronde…
         </p>
       )}
