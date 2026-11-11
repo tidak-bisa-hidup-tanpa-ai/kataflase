@@ -21,6 +21,11 @@ const MODEL_NAME = "gemini-3.5-flash-lite";
 
 const AI_TIMEOUT_MS = 5000;
 
+function extractJsonBlock(rawText) {
+  if (typeof rawText !== "string" || !rawText.trim()) return null;
+  return rawText.match(/\{[\s\S]*\}/)?.[0].trim() ?? null;
+}
+
 /**
  * Membangun prompt yang memaksa Gemini menghasilkan pasangan kata seru
  * dalam format JSON murni tanpa teks tambahan apapun.
@@ -90,7 +95,13 @@ function parseAndValidateResponse(rawText, previousPair = null) {
   try {
     parsed = JSON.parse(rawText);
   } catch {
-    throw new Error(`AI_INVALID_JSON: Tidak bisa parse JSON dari: "${rawText}"`);
+    const cleanJson = extractJsonBlock(rawText);
+    if (!cleanJson) throw new Error("AI_NO_JSON_FOUND: Respons tidak berisi objek JSON.");
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch {
+      throw new Error("AI_INVALID_JSON: Respons AI bukan JSON yang valid.");
+    }
   }
 
   const { wordA, wordB } = parsed || {};
@@ -153,4 +164,6 @@ async function generateWordPair(category, previousPair = null) {
 
 module.exports = {
   generateWordPair,
+  extractJsonBlock,
+  parseAndValidateResponse,
 };

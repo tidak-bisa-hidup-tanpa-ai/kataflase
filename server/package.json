@@ -4,18 +4,21 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node bin/www.js"
+    "start": "node bin/www.js",
+    "test": "node --test"
   },
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
+    "jest": "^30.5.2",
     "pg": "^8.23.1",
     "sequelize": "^6.37.8",
     "socket.io": "^4.8.4",
-    "@google/generative-ai": "^0.24.1"
+    "supertest": "^7.3.2"
   },
   "devDependencies": {
     "sequelize-cli": "^6.6.5"

@@ -88,7 +88,7 @@ Semua aksi memerlukan callback ACK. Identitas pemain diambil dari sesi socket; j
 | Event | Payload | Hasil |
 | --- | --- | --- |
 | `game:start` | `{ "category": "makanan" }` | Host memulai ronde ketika 3–6 anggota online. Jika kategori tidak dikirim, gunakan `acak`. ACK sukses: `{ "ok": true, "data": { "roundId": "<uuid>" } }`. |
-| `clue:submit` | `{ "roundId": "<uuid>", "text": "Hangat" }` | Satu clue, maksimal 100 karakter, pada giliran sendiri. Menyebut kata sendiri ditolak. |
+| `clue:submit` | `{ "roundId": "<uuid>", "text": "Hangat" }` | Satu clue, maksimal 100 karakter, pada giliran sendiri. Kata sendiri atau bagiannya yang dipisah spasi/simbol, seperti `k o p i` dan `k.o.p.i`, ditolak. |
 | `chat:send` | `{ "roundId": "<uuid>", "text": "Menurutku Ari" }` | Pesan 1–500 karakter selama `DISCUSSION`. Riwayat menyimpan 50 pesan terakhir. |
 | `vote:submit` | `{ "roundId": "<uuid>", "targetPlayerId": 2 }` | Target memakai ID angka dari daftar peserta. Satu suara terkunci; tidak boleh memilih diri sendiri. |
 | `game:restart` | `{ "roundId": "<uuid>" }` | Host kembali dari `RESULT` ke `WAITING`, menghapus data ronde, mempertahankan kode room dan sesi anggota. |
@@ -136,6 +136,8 @@ Sebelum `RESULT`, kata pemain lain, identitas impostor, dan pilihan suara tidak 
 ### AI dan pemulihan ronde
 
 Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Kegagalan API, timeout lima detik, atau respons invalid memakai word bank. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
+
+Respons AI dengan pembungkus markdown atau teks pengantar dibaca dari objek JSON-nya, lalu tetap diperiksa tipe, panjang, dan pasangan katanya. Field tambahan dari respons AI tidak diteruskan ke game state.
 
 Ronde disimpan di tabel `Rounds` melalui migration. Jalankan `npx sequelize-cli db:migrate` sebelum menjalankan server setelah pembaruan ini. Startup memulihkan fase dan deadline yang tersimpan serta memproses fase yang sudah kedaluwarsa. Client tetap memanggil `room:resume` untuk menerima snapshot dan kata pribadi. Jika restart terjadi saat menunggu AI, status start dilepas sehingga host bisa mencoba lagi.
 

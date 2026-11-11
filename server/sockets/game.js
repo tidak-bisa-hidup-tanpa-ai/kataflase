@@ -238,7 +238,7 @@ module.exports = (io, { emitRoomState, getOnlinePlayerIds, scheduleExpiry }) => 
         } else if (action === "vote") {
           const validation = validateVote({
             voterId: playerId, targetPlayerId: payload.targetPlayerId, activePlayers: round.players,
-            hasVoted: Object.hasOwn(round.votes, playerId),
+            votes: round.votes,
           });
           if (!validation.valid) return failure(validation.code, validation.reason);
           round.votes = { ...round.votes, [playerId]: payload.targetPlayerId };

@@ -52,6 +52,8 @@ npm start
 
 Server berjalan di `http://localhost:3000`. Dokumentasi payload untuk pengembangan client tersedia di [API server](server/API.md).
 
+Jalankan `npm test` dari folder server untuk menguji validasi clue, vote, dan parsing respons AI. Pengujian ini tidak memakai database atau memanggil API Gemini.
+
 ## Mulai kontribusi
 
 1. Clone repo, lalu pindah ke branch `development`.
