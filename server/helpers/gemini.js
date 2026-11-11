@@ -110,14 +110,12 @@ function parseAndValidateResponse(rawText, previousPair = null) {
 
   const { wordA, wordB } = parsed || {};
 
-  // Validasi 1: Kedua field harus ada dan berupa string tidak kosong
-  if (
-    typeof wordA !== "string" ||
-    typeof wordB !== "string" ||
-    wordA.trim() === "" ||
-    wordB.trim() === "" || wordA.trim().length > 60 || wordB.trim().length > 60
-  ) {
-    throw new Error("AI_INVALID_WORDS: wordA atau wordB kosong atau bukan string.");
+  const invalidWord = [wordA, wordB].some((word) =>
+    typeof word !== "string" || word.trim().length > 60
+    || !/[\p{L}\p{N}]/u.test(word) || /[\p{C}\p{Zl}\p{Zp}]/u.test(word.trim())
+  );
+  if (invalidWord) {
+    throw new Error("AI_INVALID_WORDS: Kata harus berupa teks satu baris yang bisa dimainkan.");
   }
 
   const normalizedA = wordA.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
