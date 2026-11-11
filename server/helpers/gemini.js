@@ -12,7 +12,7 @@
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const createRateLimit = require("./rateLimit");
-const { getRandomWordPair, getWordPairHash } = require("./wordBank");
+const { getRandomWordPair, getWordPairHash, getFallbackHint } = require("./wordBank");
 
 const allowAiRequest = createRateLimit(12);
 const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -257,9 +257,10 @@ async function generateClueHint(secretWord, category) {
     }
   }
 
-  // Fallback awal (akan diperkaya di Commit 2)
+  // Fallback offline berbasis kategori jika AI gagal atau offline
+  const fallbackHint = getFallbackHint(category);
   return {
-    hint: "Pikirkan ciri fisik, rasa, atau momen saat kamu menggunakannya.",
+    hint: fallbackHint,
     source: "fallback",
   };
 }

@@ -70,6 +70,51 @@ const AVAILABLE_CATEGORIES = [
   "acak",
 ];
 
+// Template petunjuk fallback offline berbasis kategori
+// Digunakan saat AI offline atau timeout agar pemain tetap mendapat inspirasi petunjuk
+const CATEGORY_HINT_TEMPLATES = {
+  makanan: [
+    "Pikirkan cita rasa khas, tekstur, atau aroma saat dinikmati.",
+    "Bisa dinikmati saat sarapan, santai, atau momen tertentu.",
+    "Sering dijumpai di meja makan, kafe, atau warung makan.",
+  ],
+  hewan: [
+    "Perhatikan habitat tempat tinggal, gerakan, atau suara khasnya.",
+    "Pikirkan apakah jinak atau liar, serta makanan alaminya.",
+    "Fokus pada ciri fisik seperti ukuran, bulu, atau cara berpindahnya.",
+  ],
+  teknologi: [
+    "Pikirkan fungsi utamanya dalam mempermudah pekerjaan sehari-hari.",
+    "Bisa dibawa kemana-mana atau terpasang di ruangan tertentu.",
+    "Memerlukan daya listrik, baterai, atau tombol navigasi.",
+  ],
+  olahraga: [
+    "Pikirkan arena tempat memainkannya atau perlengkapan yang dipakai.",
+    "Melibatkan ketangkasan fisik, kecepatan, atau kerja sama.",
+    "Bisa dimainkan secara santai maupun dipertandingkan resmi.",
+  ],
+  transportasi: [
+    "Pikirkan jalurnya: melaju di darat, rel, air, atau udara.",
+    "Biasa digunakan untuk mobilitas harian atau perjalanan jauh.",
+    "Memiliki kapasitas angkut khusus dan tujuan perjalanan.",
+  ],
+};
+
+/**
+ * Mengambil petunjuk fallback offline yang bervariasi sesuai kategori.
+ *
+ * @param {string} category - Kategori permainan
+ * @returns {string} Petunjuk inspiratif yang aman dari spoiler
+ */
+function getFallbackHint(category) {
+  const templates = CATEGORY_HINT_TEMPLATES[category] || [
+    "Pikirkan ciri fisik, fungsi umum, atau suasana saat kamu menggunakannya.",
+    "Fokus pada karakteristik unik tanpa menyebutkan wujud aslinya.",
+  ];
+  const randomIndex = Math.floor(Math.random() * templates.length);
+  return templates[randomIndex];
+}
+
 /**
  * Mengambil satu pasangan kata secara acak dari kategori tertentu.
  * Menghindari pengulangan pasangan dari ronde sebelumnya.
@@ -131,6 +176,7 @@ function isValidCategory(category) {
 module.exports = {
   getWordPairHash,
   getRandomWordPair,
+  getFallbackHint,
   getAvailableCategories,
   isValidCategory,
   WORD_BANK,
