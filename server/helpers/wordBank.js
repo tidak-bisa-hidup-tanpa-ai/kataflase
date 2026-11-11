@@ -107,7 +107,7 @@ const CATEGORY_HINT_TEMPLATES = {
  * @returns {string} Petunjuk inspiratif yang aman dari spoiler
  */
 function getFallbackHint(category) {
-  const templates = CATEGORY_HINT_TEMPLATES[category] || [
+  const templates = Object.hasOwn(CATEGORY_HINT_TEMPLATES, category) ? CATEGORY_HINT_TEMPLATES[category] : [
     "Pikirkan ciri fisik, fungsi umum, atau suasana saat kamu menggunakannya.",
     "Fokus pada karakteristik unik tanpa menyebutkan wujud aslinya.",
   ];

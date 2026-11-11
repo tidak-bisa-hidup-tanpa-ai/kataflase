@@ -52,6 +52,8 @@ test("fallback hint tersedia sebagai string untuk semua kategori", () => {
     "transportasi",
     "acak",
     "kategori_kustom",
+    "constructor",
+    "__proto__",
   ];
 
   for (const category of categories) {
@@ -82,11 +84,12 @@ test("generateClueHint memakai fallback saat API key kosong", async () => {
 });
 
 test("generateClueHint menolak respons AI yang membocorkan kata rahasia", async () => {
-  const { generateClueHint } = loadGemini({ responseText: '{"hint":"Kopi hangat"}' });
-  const result = await generateClueHint("Kopi", "makanan");
-
-  assert.equal(result.source, "fallback");
-  assert.ok(!result.hint.toLocaleLowerCase("id-ID").includes("kopi"));
+  for (const hint of ["Kopi hangat", "k.o.p.i hangat"]) {
+    const { generateClueHint } = loadGemini({ responseText: JSON.stringify({ hint }) });
+    const result = await generateClueHint("Kopi", "makanan");
+    assert.equal(result.source, "fallback");
+    assert.ok(!result.hint.toLocaleLowerCase("id-ID").includes("kopi"));
+  }
 });
 
 test("generateMatchRecap merangkum kemenangan warga dan impostor", async () => {

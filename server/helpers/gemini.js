@@ -13,6 +13,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const createRateLimit = require("./rateLimit");
 const { getRandomWordPair, getWordPairHash, getFallbackHint } = require("./wordBank");
+const { validateClue } = require("./validator");
 
 const allowAiRequest = createRateLimit(12);
 const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -234,12 +235,8 @@ async function callGeminiHint({ name, timeout }, secretWord, category) {
   }
 
   const hint = parsed.hint.trim();
-  const normalize = (value) => value.normalize("NFKC").toLocaleLowerCase("id-ID");
-  const normalizedHint = normalize(hint);
-  const secretParts = normalize(secretWord).match(/[\p{L}\p{N}]+/gu) || [];
-  const hintParts = normalizedHint.match(/[\p{L}\p{N}]+/gu) || [];
-  if (secretParts.some((part) => hintParts.includes(part))) {
-    throw new Error("AI_HINT_LEAK: Hint mengandung kata rahasia.");
+  if (!validateClue(hint, secretWord).valid || hint.split(/\s+/).length > 3) {
+    throw new Error("AI_INVALID_HINT: Saran tidak sesuai aturan petunjuk.");
   }
 
   return hint;
@@ -250,7 +247,7 @@ async function callGeminiHint({ name, timeout }, secretWord, category) {
  *
  * @param {string} secretWord - Kata rahasia milik pemain
  * @param {string} category - Kategori permainan
- * @returns {Promise<{ hint: string, source: "ai" | "fallback" }>}
+ * @returns {Promise<{ hint: string | null, source: "ai" | "fallback" }>}
  */
 async function generateClueHint(secretWord, category) {
   if (apiKey) {
@@ -261,7 +258,7 @@ async function generateClueHint(secretWord, category) {
         console.info(`[Gemini Hint] Berhasil dengan model: ${model.name}`);
         return { hint, source: "ai" };
       } catch (error) {
-        console.warn(`[Gemini Hint] ${model.name} gagal: ${error.message}`);
+        console.warn(`[Gemini Hint] ${model.name} gagal: ${error.name}`);
       }
     }
   }
@@ -269,7 +266,7 @@ async function generateClueHint(secretWord, category) {
   // Fallback offline berbasis kategori jika AI gagal atau offline
   const fallbackHint = getFallbackHint(category);
   return {
-    hint: fallbackHint,
+    hint: validateClue(fallbackHint, secretWord).valid ? fallbackHint : null,
     source: "fallback",
   };
 }
@@ -296,6 +293,7 @@ ${clueSummary}
 
 Tugasmu:
 Buatlah 1-2 kalimat ulasan singkat yang jenaka, seru, dan menghibur tentang ronde ini.
+Gunakan detail yang diberikan dan jangan mengarang kejadian atau mengubah hasil voting.
 Gaya bahasa: Santai, gaul, ramah anak muda Indonesia, ceria, dan tanpa emoji berlebihan.
 
 Output WAJIB berupa JSON murni tanpa markdown:
@@ -333,8 +331,8 @@ async function callGeminiRecap({ name, timeout }, gameData) {
     throw new Error("AI_INVALID_JSON: Format JSON recap tidak valid.");
   }
 
-  if (!parsed.recap || typeof parsed.recap !== "string" || !parsed.recap.trim()) {
-    throw new Error("AI_INVALID_RECAP: Teks recap kosong atau bukan string.");
+  if (typeof parsed?.recap !== "string" || !parsed.recap.trim() || parsed.recap.trim().length > 350) {
+    throw new Error("AI_INVALID_RECAP: Teks recap harus berisi 1–350 karakter.");
   }
 
   return parsed.recap.trim();
@@ -352,14 +350,14 @@ function getFallbackRecap({ winner, impostorNickname, majorityWord, impostorWord
     const templates = [
       `Warga jeli banget! Penyamaran ${nick} dengan kata "${impostorWord}" langsung terbongkar oleh kubu "${majorityWord}".`,
       `Insting detektif warga patut diacungi jempol! ${nick} akhirnya tertangkap basah di sesi voting.`,
-      `Permainan kompak dari warga! ${nick} mencoba berbaur tapi petunjuknya malah bikin semua orang curiga.`,
+      `Voting jadi penentu! Warga berhasil mengungkap ${nick} sebagai impostor.`,
     ];
     return templates[Math.floor(Math.random() * templates.length)];
   }
 
   const templates = [
-    `Akting kelas atas dari ${nick}! Sukses mengecoh seluruh warga dan mengamankan kemenangan dengan kata "${impostorWord}".`,
-    `Warga terkecoh total! ${nick} berhasil lolos santai tanpa dicurigai sama sekali di ronde ini.`,
+    `Akting kelas atas dari ${nick}! Kata "${impostorWord}" mengantar sang impostor ke kemenangan.`,
+    `Papan suara berpihak pada ${nick}. Sang impostor berhasil lolos di ronde ini.`,
     `Kemenangan mulus buat ${nick}! Perbedaan "${majorityWord}" dan "${impostorWord}" berhasil disamarkan dengan sempurna.`,
   ];
   return templates[Math.floor(Math.random() * templates.length)];
@@ -386,7 +384,7 @@ async function generateMatchRecap(gameData = {}) {
         console.info(`[Gemini Recap] Berhasil dengan model: ${model.name}`);
         return { recap, source: "ai" };
       } catch (error) {
-        console.warn(`[Gemini Recap] ${model.name} gagal: ${error.message}`);
+        console.warn(`[Gemini Recap] ${model.name} gagal: ${error.name}`);
       }
     }
   }

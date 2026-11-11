@@ -77,7 +77,7 @@ function ResultView() {
       <Mascot
         impostor
         mood={impostorWins ? 'smug' : 'caught'}
-        word={words.get(result.impostorId) ?? ''}
+        word={words[result.impostorId] ?? ''}
         className="relative -mb-4 w-20 shrink-0 motion-safe:animate-bob lg:w-28"
         title={impostorWins ? 'Kartu impostor lolos' : 'Kartu impostor tertangkap'}
       />
@@ -131,6 +131,14 @@ function ResultView() {
       )}
 
       <p className="mt-5 text-[13px] leading-relaxed">{result.reason || defaultReason(result, room)}</p>
+      <div role="status">
+        {result.recap?.recap && (
+          <div className="mt-4 border-t border-ink/30 pt-3">
+            <h3 className="label">Ulasan ronde</h3>
+            <p className="mt-1 text-sm wrap-break-word">{result.recap.recap}</p>
+          </div>
+        )}
+      </div>
 
       <div className="mt-7">
         {isHost ? (
