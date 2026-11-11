@@ -39,9 +39,6 @@
     --color-tangerine: #7a4027;
     --color-online: #88dec0;
     --color-scrim: #0b0a15;
-    --toast-info: var(--color-card);
-    --toast-success: #394ab9;
-    --toast-error: var(--color-flame);
   }
 
   body {

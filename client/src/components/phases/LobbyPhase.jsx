@@ -5,7 +5,7 @@ import { MAX_PLAYERS, MIN_PLAYERS, RANDOM_CATEGORY } from '../../constant/game'
 import { useGame } from '../../contexts/GameContext'
 import { SERVER_URL } from '../../constant/url'
 import { toast } from '../../helpers/toast'
-import { useLeaveRoom } from '../../helpers/useLeaveRoom'
+import LeaveRoomButton from '../room/LeaveRoomButton'
 import AppHeader from '../AppHeader'
 import PlayerList from '../room/PlayerList'
 import RoomHeader from '../room/RoomHeader'
@@ -26,7 +26,6 @@ function startBlocker(room) {
 
 export default function LobbyPhase() {
   const { room, isHost, startGame, canAct } = useGame()
-  const leave = useLeaveRoom()
   const [options, setOptions] = useState([RANDOM_CATEGORY])
   const [category, setCategory] = useState(RANDOM_CATEGORY.id)
   const [customCategory, setCustomCategory] = useState('')
@@ -69,9 +68,7 @@ export default function LobbyPhase() {
     <div>
       <AppHeader
         right={
-          <button type="button" className="pill" onClick={leave}>
-            Keluar
-          </button>
+          <LeaveRoomButton className="pill">Keluar</LeaveRoomButton>
         }
       />
       <div className="lg:mt-4 lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-12">

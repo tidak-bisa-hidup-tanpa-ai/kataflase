@@ -50,7 +50,7 @@ src/
   components/RoomGate.jsx   Sesi kedaluwarsa, tautan langsung, resume
   components/room/          Header, pemain, kata, clue, chat
   components/phases/        Lobby, WordReveal, Clue, Discussion, Voting
-  helpers/                  Session, room, toast, countdown, keluar room
+  helpers/                  Session, room, toast, countdown
 ```
 
 Halaman berada di `pages/` dan bagian UI yang dipakai halaman berada di `components/`, mengikuti pola GC02 dan Rewear. `App.jsx` mendefinisikan rute; `BaseLayout` menampilkan `Outlet`. `GameProvider` dipasang satu kali di `main.jsx` agar sesi tetap tersedia ketika halaman berubah. Pemanggilan REST kategori memakai Axios langsung di `LobbyPhase` dengan `async/await` dan `try/catch`. Listener di `GameProvider` mengirim snapshot publik `room:state` ke Redux. `useGame()` meneruskan data itu ke komponen tanpa salinan state room di Context. `player:state` tetap di client pemain terkait dan token sesi tetap di `sessionStorage`. Tema terang/gelap dikelola `ThemeContext`, disimpan di `localStorage`, dan berlaku untuk semua halaman melalui token CSS.
