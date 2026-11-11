@@ -1,0 +1,96 @@
+@import 'tailwindcss';
+
+/* Arah visual: cetak riso salah register. Kata yang sama dicetak tajam,
+   kata yang berbeda dicetak geser dua warna. */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --color-paper: #f2eadb;
+  --color-card: #fffaf0;
+  --color-ink: #1c1b3f;
+  --color-muted: #6e6a82;
+  --color-sun: #f8d34f;
+  --color-flame: #ef6b8c;
+  --color-cobalt: #3d5bf2;
+  --color-mint: #79d2ad;
+  --color-tangerine: #f59e5b;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply min-h-svh bg-paper font-sans text-[15px] text-ink antialiased;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--color-sun);
+  }
+}
+
+@layer components {
+  .label {
+    @apply font-mono text-[11px] font-medium tracking-[0.14em] text-ink uppercase;
+  }
+
+  .display {
+    @apply font-display font-extrabold tracking-[-0.035em] text-ink;
+  }
+
+  .card {
+    @apply rounded-xl border-2 border-ink bg-card;
+  }
+
+  .btn {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-ink px-4 font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cobalt enabled:active:translate-x-[2px] enabled:active:translate-y-[2px] enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ink {
+    @apply bg-ink text-card shadow-[3px_3px_0_var(--color-flame)];
+  }
+
+  .btn-sun {
+    @apply bg-sun text-ink shadow-[3px_3px_0_var(--color-ink)];
+  }
+
+  .btn-cobalt {
+    @apply bg-cobalt text-card shadow-[3px_3px_0_var(--color-ink)];
+  }
+
+  .btn-outline {
+    @apply bg-card text-ink;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-card px-3 py-1.5 font-mono text-[11px] font-medium tracking-[0.1em] text-ink uppercase;
+  }
+
+  .input {
+    @apply min-h-12 w-full rounded-xl border-2 border-ink bg-card px-4 text-[15px] text-ink placeholder:text-muted focus:ring-4 focus:ring-cobalt/25 focus:outline-none;
+  }
+
+  /* Teks dicetak geser dua warna */
+  .misreg {
+    color: var(--color-cobalt);
+    text-shadow: 0.045em 0.035em 0 var(--color-flame);
+  }
+
+  .halftone {
+    background-image: radial-gradient(var(--color-flame) 1.3px, transparent 1.6px);
+    background-size: 9px 9px;
+  }
+
+  .halftone-blue {
+    background-image: radial-gradient(var(--color-cobalt) 1.3px, transparent 1.6px);
+    background-size: 9px 9px;
+  }
+}
