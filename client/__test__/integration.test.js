@@ -60,6 +60,7 @@ test('peserta dengan playerId angka melihat giliran dan nama pengirim clue', () 
   const html = render(CluePhase, { phase: 'CLUE' })
   assert.match(html, /Giliran kamu/)
   assert.match(html, /Petunjukmu muncul di sini/)
+  assert.match(html, /Minta Saran/)
   assert.match(html, /Fardian/)
   assert.match(html, /Hangat/)
 })
@@ -80,6 +81,7 @@ test('hasil menampilkan kata, tally, impostor, dan abstain dari kontrak server',
       winner: 'CIVILIANS', impostorId: 2, reason: 'Impostor tertangkap.',
       playerWords: { 1: 'Kopi', 2: 'Teh', 3: 'Kopi' },
       voteTally: { 1: 0, 2: 2, 3: 0 },
+      recap: { recap: 'Warga kompak menangkap impostor.', source: 'fallback' },
     },
   })
   assert.match(html, /Pemain biasa menang/)
@@ -90,6 +92,8 @@ test('hasil menampilkan kata, tally, impostor, dan abstain dari kontrak server',
   assert.match(html, />2<\/span>/)
   assert.match(html, /1 pemain abstain/)
   assert.match(html, /Main Lagi/)
+  assert.match(html, /Kartu impostor tertangkap/)
+  assert.match(html, /Warga kompak menangkap impostor\./)
 })
 
 test('build menghasilkan CSS untuk layout mobile dan desktop', async () => {

@@ -7,6 +7,7 @@ import { cleanNickname, isValidNickname } from '../helpers/room'
 import { loadNickname, saveNickname } from '../helpers/session'
 import { toast } from '../helpers/toast'
 import AppHeader from './AppHeader'
+import Mascot from './ui/Mascot'
 
 function ExpiredNotice() {
   const { expiredReason, dismissExpired } = useGame()
@@ -20,7 +21,8 @@ function ExpiredNotice() {
   return (
     <div>
       <AppHeader />
-      <h1 className="display mt-14 text-[44px] leading-none">
+      <Mascot mood="sleepy" className="mt-10 w-24" />
+      <h1 className="display mt-4 text-[44px] leading-none">
         Sesi <span className="misreg">berakhir</span>
       </h1>
       <p className="mt-4 text-sm">
@@ -57,7 +59,8 @@ function JoinFromLink({ code }) {
     <div>
       <AppHeader />
       <form onSubmit={onSubmit}>
-        <section className="mt-6 rounded-2xl border-2 border-ink bg-ink p-4 text-card shadow-[4px_4px_0_var(--color-flame)]">
+        <Mascot mood="wave" className="mx-auto mt-6 w-24 motion-safe:animate-bob" />
+        <section className="mt-2 rounded-2xl border-2 border-ink bg-ink p-4 text-card shadow-[4px_4px_0_var(--color-flame)]">
           <p className="label text-card/75">Kamu diundang ke room</p>
           <p className="mt-1 text-center font-mono text-4xl font-bold tracking-[0.25em]">{code}</p>
         </section>
@@ -110,9 +113,12 @@ function Loading() {
             </button>
           </>
         ) : (
-          <p className="animate-pulse font-mono text-xs tracking-[0.14em] uppercase">
-            Menyambungkan ke room…
-          </p>
+          <>
+            <Mascot mood="peek" className="mx-auto w-24 motion-safe:animate-bob" />
+            <p className="mt-4 animate-pulse font-mono text-xs tracking-[0.14em] uppercase">
+              Menyambungkan ke room…
+            </p>
+          </>
         )}
       </div>
     </div>

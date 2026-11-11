@@ -5,6 +5,7 @@ import { useGame } from '../../contexts/GameContext'
 import { playerName } from '../../helpers/room'
 import { toast } from '../../helpers/toast'
 import { ArrowIcon } from '../ui/Icons'
+import Mascot from '../ui/Mascot'
 
 export default function ChatBox({ canSend = true }) {
   const { room, playerId, sendChat, canAct } = useGame()
@@ -34,7 +35,10 @@ export default function ChatBox({ canSend = true }) {
       <div className="lg:flex-1 lg:overflow-y-auto lg:p-4">
       <ul className="space-y-3" aria-live="polite" aria-label="Chat diskusi">
         {messages.length === 0 && (
-          <li className="text-sm text-muted">Belum ada pesan. Mulai diskusinya!</li>
+          <li className="flex flex-col items-center py-6 text-center text-sm text-muted">
+            <Mascot mood="whisper" className="w-24 motion-safe:animate-bob" />
+            <span className="mt-2">Belum ada pesan. Siapa yang paling mencurigakan?</span>
+          </li>
         )}
         {messages.map((message, index) => {
           const mine = message.playerId === playerId

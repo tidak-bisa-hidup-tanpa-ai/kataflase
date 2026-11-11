@@ -21,12 +21,16 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
   const clients = [];
   let server;
   let url;
+  const clientOrigin = "https://kataflase-client.example";
   async function startServer() {
     let output = "";
     server = spawn(process.execPath, ["bin/www.js"], {
       cwd: path.join(__dirname, ".."), windowsHide: true,
       // Lewati .env lokal agar tes fallback tidak memakai key Gemini pengguna.
-      env: { ...process.env, NODE_ENV: "production", PORT: "0", GEMINI_API_KEY: "" },
+      env: {
+        ...process.env, NODE_ENV: "production", PORT: "0", GEMINI_API_KEY: "",
+        CLIENT_ORIGIN: ` ${clientOrigin}/ `,
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
     server.stdout.on("data", (chunk) => { output += chunk; });
@@ -83,8 +87,14 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
 
   await startServer();
   assert.deepEqual(await (await fetch(`${url}/health`)).json(), { data: { status: "ok" } });
-  assert.ok((await (await fetch(`${url}/api/game-options`)).json()).data.categories.includes("acak"));
-  const rejected = await fetch(url + "/socket.io/?EIO=4&transport=polling", {
+  const options = await fetch(`${url}/api/game-options`, { headers: { Origin: clientOrigin } });
+  assert.equal(options.headers.get("access-control-allow-origin"), clientOrigin);
+  assert.ok((await options.json()).data.categories.includes("acak"));
+  const handshakeUrl = url + "/socket.io/?EIO=4&transport=polling";
+  const accepted = await fetch(handshakeUrl, { headers: { Origin: clientOrigin } });
+  assert.equal(accepted.status, 200);
+  assert.match(await accepted.text(), /^0\{/);
+  const rejected = await fetch(handshakeUrl, {
     headers: { Origin: "https://outside.example" },
   });
   assert.equal(rejected.status, 403);
@@ -122,11 +132,23 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
     assert.equal(typeof client.session.playerId, "number");
   }
   await error(team[1], "vote:submit", { roundId, targetPlayerId: first.playerId }, "INVALID_PHASE");
+  await error(team[1], "clue:hint", { roundId }, "INVALID_PHASE");
+  await error(outsider, "clue:hint", { roundId }, "INVALID_ROUND");
   await error(outsider, "clue:submit", { roundId, text: "unik" }, "INVALID_ROUND");
   await waitPhase(team[0], "CLUE", 12000);
   for (const id of state(team[0]).turnOrder) {
     const client = team.find((member) => member.session.playerId === id);
     await until(() => state(client).currentTurnPlayerId === id, "clue turn");
+    const waiting = team.find((member) => member !== client);
+    await error(waiting, "clue:hint", { roundId }, "NOT_YOUR_TURN");
+    const hints = await Promise.all([
+      send(client, "clue:hint", { roundId }),
+      send(client, "clue:hint", { roundId }),
+    ]);
+    assert.equal(hints[0].ok, true);
+    assert.equal(hints[0].data.source, "fallback");
+    assert.ok(hints[0].data.hint);
+    assert.deepEqual(hints[0], hints[1]);
     await error(client, "clue:submit", { roundId, text: [...words[id]].join(" . ") }, "INVALID_CLUE");
     const replies = await Promise.all([
       send(client, "clue:submit", { roundId, text: "unik" }),
@@ -183,7 +205,7 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
   for (const client of team) {
     for (const snapshot of client.states.filter((item) => item.roundId === roundId && item.phase !== "RESULT")) {
       assert.equal(snapshot.result, null);
-      assert.ok(!/"(playerWords|impostorId|sessionTokenHash|sessionToken)"/.test(JSON.stringify(snapshot)));
+      assert.ok(!/"(playerWords|impostorId|sessionTokenHash|sessionToken|hint|recap)"/.test(JSON.stringify(snapshot)));
     }
   }
   const remaining = team.filter((client) => client !== resumed);
@@ -195,6 +217,9 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
   assert.equal(result.result.winner, "CIVILIANS");
   assert.equal(result.result.impostorId, impostorId);
   assert.deepEqual(result.result.playerWords, words);
+  await until(() => team.every((client) => state(client)?.result?.recap?.source === "fallback"), "recap sync");
+  assert.ok(state(team[0]).result.recap.recap);
+  assert.deepEqual(state(team[0]).result.recap, state(team[1]).result.recap);
   assert.ok(outsider.states.every((snapshot) => snapshot.code !== first.code && snapshot.roundId === null));
   const host = team.find((client) => client.session.playerId === result.hostId);
   assert.equal((await send(host, "game:restart", { roundId })).ok, true);

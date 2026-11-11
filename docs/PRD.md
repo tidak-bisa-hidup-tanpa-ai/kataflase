@@ -42,12 +42,14 @@ Layar lobby, kata, clue, diskusi, dan voting memakai tampilan room yang sama. Ko
 
 Server memeriksa respons terstruktur dan mencoba model cadangan jika model utama gagal. Jika kedua model gagal, kategori bawaan memakai word bank lokal. Untuk **Kategori Sendiri**, host tetap di lobby dan bisa mencoba lagi atau memilih kategori bawaan. Kualitas pasangan diuji saat playtest. Satu ronde dengan pasangan dari AI dan satu ronde dengan fallback harus bisa ditunjukkan saat pengujian.
 
+Pemain dapat meminta **saran privat** saat gilirannya memberi petunjuk. Saran diperiksa agar tidak menyebut kata rahasianya dan tidak otomatis dikirim ke pemain lain. Setelah hasil voting tampil, pemain menerima **ulasan ronde**. Keduanya punya cadangan lokal jika Gemini tidak tersedia.
+
 ## Batas MVP
 
 | Prioritas                       | Cakupan                                                                                                                                                                                           |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P0**                          | Room privat lewat kode, sesi nickname, satu ronde lengkap, clue bergiliran, chat, vote, hasil, main lagi dengan kode yang sama, reconnect selama server masih berjalan, penanganan sesi yang hilang setelah restart, AI dan fallback, tampilan mobile, serta client dan server publik. |
-| **P1 setelah alur inti stabil** | Variasi difficulty, voting ulang, scoreboard lintas ronde, timer yang bisa diatur host, animasi tambahan, dan AI recap.                                                                           |
+| **P1 setelah alur inti stabil** | Variasi difficulty, voting ulang, scoreboard lintas ronde, timer yang bisa diatur host, dan animasi tambahan.                                                                                        |
 | **Di luar cakupan versi ini**   | Akun permanen, leaderboard persisten, matchmaking publik, friend list, voice/video, dan role tambahan.                                                                                            |
 
 ## Kesesuaian dengan rubrik Hacktiv8

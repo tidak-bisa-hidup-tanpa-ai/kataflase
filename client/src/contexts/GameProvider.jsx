@@ -7,7 +7,7 @@ import { socket } from '../socket'
 import { GameContext } from './GameContext'
 
 const ACK_TIMEOUT_MS = 8000
-const START_ACK_TIMEOUT_MS = 15000
+const AI_ACK_TIMEOUT_MS = 15000
 const CONNECT_TIMEOUT_MS = 6000
 const ROOM_FALLBACK_MS = 2000
 
@@ -24,7 +24,9 @@ async function emitConnected(event, payload) {
   if (!socket.connected) return { ok: false, code: 'NETWORK' }
   try {
     const args = payload === undefined ? [] : [payload]
-    const timeout = event === 'game:start' ? START_ACK_TIMEOUT_MS : ACK_TIMEOUT_MS
+    const timeout = event === 'game:start' || event === 'clue:hint'
+      ? AI_ACK_TIMEOUT_MS
+      : ACK_TIMEOUT_MS
     const res = await socket.timeout(timeout).emitWithAck(event, ...args)
     return normalizeAck(res)
   } catch {
@@ -248,8 +250,9 @@ export function GameProvider({ children }) {
       if (!socket.connected || !boundRef.current) {
         return { ok: false, code: 'NETWORK' }
       }
+      const current = sessionRef.current
       const res = await emitConnected(event, payload)
-      if (!res.ok && sessionRef.current && isExpiredCode(res.code)) {
+      if (!res.ok && current && sessionRef.current === current && isExpiredCode(res.code)) {
         expire(res.code)
       }
       return res
@@ -269,6 +272,11 @@ export function GameProvider({ children }) {
 
   const submitClue = useCallback(
     (text) => act('clue:submit', { roundId: selectRoom(store.getState())?.roundId, text }),
+    [act, store],
+  )
+
+  const requestClueHint = useCallback(
+    () => act('clue:hint', { roundId: selectRoom(store.getState())?.roundId }),
     [act, store],
   )
 
@@ -326,6 +334,7 @@ export function GameProvider({ children }) {
       startGame,
       restartGame,
       submitClue,
+      requestClueHint,
       sendChat,
       submitVote,
       dismissExpired,
@@ -345,6 +354,7 @@ export function GameProvider({ children }) {
     startGame,
     restartGame,
     submitClue,
+    requestClueHint,
     sendChat,
     submitVote,
     dismissExpired,

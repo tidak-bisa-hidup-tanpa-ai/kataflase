@@ -6,6 +6,7 @@ import { useGame } from '../contexts/GameContext'
 import { cleanNickname, cleanRoomCode, isValidNickname } from '../helpers/room'
 import { loadNickname, saveNickname } from '../helpers/session'
 import { toast } from '../helpers/toast'
+import Mascot from '../components/ui/Mascot'
 
 export default function HomePage() {
   const { session, createRoom, joinRoom, expiredReason, dismissExpired } = useGame()
@@ -75,18 +76,16 @@ export default function HomePage() {
           Semua orang dapat kata yang sama. Satu orang tidak.
         </p>
 
-        <div className="mt-5 flex items-end gap-2 lg:mt-8 lg:gap-3" aria-hidden="true">
-          {['Kopi', 'Kopi', 'Kopi'].map((word, index) => (
-            <span
-              key={index}
-              className="card flex h-16 w-14 items-end p-1.5 text-sm font-bold lg:h-24 lg:w-20 lg:p-2 lg:text-base"
-            >
-              {word}
-            </span>
+        <div className="mt-4 flex items-end gap-1 lg:mt-6 lg:gap-2" aria-hidden="true">
+          {['happy', 'wave', 'happy'].map((mood, index) => (
+            <Mascot key={index} mood={mood} word="Kopi" className="w-18 lg:w-28" />
           ))}
-          <span className="card ml-1 flex h-16 w-14 -translate-y-1 rotate-[-8deg] items-end bg-flame p-1.5 text-sm font-bold shadow-[3px_3px_0_var(--color-ink)] lg:h-24 lg:w-20 lg:p-2 lg:text-base">
-            Teh
-          </span>
+          <Mascot
+            mood="smug"
+            impostor
+            word="Teh"
+            className="w-18 -translate-y-1 motion-safe:animate-bob lg:w-28"
+          />
         </div>
         <p className="mt-2 font-mono text-[11px] text-muted lg:mt-3 lg:text-xs">
           3 pemain dapat Kopi. 1 dapat Teh. Siapa?
