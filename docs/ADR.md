@@ -32,6 +32,8 @@ Mengikuti arahan instructor, MVP tidak menggunakan database. Tim menerima bahwa 
 - **Voting.** Daftar peserta dikunci saat ronde dimulai. Simpan suara dengan `playerId` sebagai kunci. Validasi, pencatatan suara, dan perubahan ke `RESULT` dilakukan secara sinkron dalam satu proses tanpa `await` di antaranya. Timer dan suara terakhir hanya bisa menutup satu hasil untuk ronde yang sama. Kirim pembaruan socket setelah state diperbarui.
 - **Replay.** Pertahankan hasil selama fase `RESULT`. Saat host mengirim `game:restart` untuk `roundId` yang aktif, kosongkan state ronde lama, batalkan timer-nya, dan kembalikan room ke `WAITING`. Kode room, anggota, dan sesi tetap berlaku. Simpan hash pasangan kata terakhir di room untuk mencegah pengulangan langsung. Ronde baru mendapat `roundId` baru.
 
+- **Room kosong.** Room dihapus ketika tidak ada anggota yang tersisa. Di luar lobby, room dihapus setelah semua anggota offline selama lima menit. **Main Lagi** mempertahankan room dan sesi yang masih berlaku.
+
 ## Data dan batas akses
 
 | Data                | Isi minimum                                                                                                                                                     |
@@ -79,4 +81,4 @@ Validasi struktur dilakukan otomatis. Kelayakan makna dan kualitas petunjuk dini
 
 Pertahankan folder `client/` dan `server/`. Developer 1 memiliki tampilan dan Context. Developer 2 memiliki transport, sesi, dan penyusunan payload. Developer 3 memiliki aturan ronde dan AI. Sepakati contoh `room:state` dan `player:state` sebelum menyambungkan pekerjaan.
 
-**Masih terbuka.** Provider dan hosting spesifik mengikuti akses tim. Cakupan endpoint REST dikonfirmasi ke instructor. Durasi timer bisa disesuaikan setelah playtest dan dicatat di PRD. Kebijakan retensi untuk room yang ditinggalkan perlu diputuskan terpisah dari **Main Lagi**.
+**Masih terbuka.** Provider dan hosting spesifik mengikuti akses tim. Cakupan endpoint REST dikonfirmasi ke instructor. Durasi timer bisa disesuaikan setelah playtest dan dicatat di PRD.

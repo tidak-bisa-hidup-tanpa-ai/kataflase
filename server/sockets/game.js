@@ -54,10 +54,14 @@ function advanceExpired(room, round) {
 module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry }) => {
   const timers = new Map();
 
+  function clearRoundTimer(code) {
+    clearTimeout(timers.get(code));
+    timers.delete(code);
+  }
+
   function publish(room) {
     const state = emitRoomState(io, room);
-    clearTimeout(timers.get(room.code));
-    timers.delete(room.code);
+    clearRoundTimer(room.code);
     const { round } = state;
     if (!round?.deadlineAt || room.phase === "RESULT") return;
 
@@ -90,12 +94,13 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
 
   function cancelStart(attempt) {
     const room = rooms.get(attempt.room.code);
-    if (room === attempt.room && room.phase === "WAITING"
+    if (room !== attempt.room) return;
+    if (room.phase === "WAITING"
       && room.isStarting && room.revision === attempt.revision) {
       room.isStarting = false;
       room.revision += 1;
     }
-    if (room) publish(room);
+    publish(room);
   }
 
   async function start(socket, payload, acknowledge) {
@@ -245,6 +250,7 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
   }
 
   return {
+    clearRoundTimer,
     register(socket) {
       socket.on("game:start", (payload, acknowledge) => start(socket, payload, acknowledge));
       for (const [event, action] of Object.entries({

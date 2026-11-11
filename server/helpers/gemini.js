@@ -11,8 +11,10 @@
  */
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const createRateLimit = require("./rateLimit");
 const { getRandomWordPair, getWordPairHash } = require("./wordBank");
 
+const allowAiRequest = createRateLimit(12);
 const apiKey = process.env.GEMINI_API_KEY?.trim();
 const genAI = new GoogleGenerativeAI(apiKey);
 const primary = { name: process.env.GEMINI_PRIMARY_MODEL?.trim() || "gemini-3.5-flash-lite", timeout: 7000 };
@@ -147,8 +149,13 @@ function parseAndValidateResponse(rawText, previousPair = null) {
  * @returns {Promise<{ wordA: string, wordB: string, source: "ai" | "wordbank" } | null>}
  */
 async function generateWordPair(category, previousPair = null, { allowWordBank = true } = {}) {
+  let fallbackReason = apiKey ? "MODELS_FAILED" : "AI_KEY_MISSING";
   if (apiKey) {
     for (const model of models) {
+      if (!allowAiRequest()) {
+        fallbackReason = "RATE_LIMIT";
+        break;
+      }
       try {
         const wordPair = await callGeminiAPI(model, category, previousPair);
         console.info(`[Gemini] Model berhasil: ${model.name}`);
@@ -166,7 +173,7 @@ async function generateWordPair(category, previousPair = null, { allowWordBank =
 
   if (!allowWordBank) return null;
 
-  console.warn(`[Gemini] Memakai word bank: ${apiKey ? "MODELS_FAILED" : "AI_KEY_MISSING"}`);
+  console.warn(`[Gemini] Memakai word bank: ${fallbackReason}`);
   return { ...getRandomWordPair(category, previousPair), source: "wordbank" };
 }
 

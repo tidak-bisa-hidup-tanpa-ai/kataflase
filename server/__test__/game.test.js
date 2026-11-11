@@ -84,6 +84,16 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
   await startServer();
   assert.deepEqual(await (await fetch(`${url}/health`)).json(), { data: { status: "ok" } });
   assert.ok((await (await fetch(`${url}/api/game-options`)).json()).data.categories.includes("acak"));
+  const rejected = await fetch(url + "/socket.io/?EIO=4&transport=polling", {
+    headers: { Origin: "https://outside.example" },
+  });
+  assert.equal(rejected.status, 403);
+  const solo = await connect();
+  const empty = await enter(solo, "room:create", { nickname: "Room kosong" });
+  assert.equal((await send(solo, "room:leave")).ok, true);
+  await error(solo, "room:join", { code: empty.code, nickname: "Kembali" }, "ROOM_NOT_FOUND");
+  const abandoned = await enter(solo, "room:create", { nickname: "Room offline" });
+  solo.socket.disconnect();
   const team = await Promise.all([connect(), connect(), connect()]);
   await error(team[0], "room:create", { nickname: " " }, "INVALID_NICKNAME");
   const first = await enter(team[0], "room:create", { nickname: "Host" });
@@ -149,6 +159,7 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
   await until(() => !state(nextHost)?.players.some((player) => player.playerId === departed.playerId), "30-second expiry", 35000);
   const expired = await connect();
   await error(expired, "room:resume", departed, "SESSION_EXPIRED");
+  await error(expired, "room:join", { code: abandoned.code, nickname: "Kembali" }, "ROOM_NOT_FOUND");
   team[1] = await connect();
   await enter(team[1], "room:resume", offlineSession);
   assert.equal(team[1].privateStates.at(-1).word, words[offlineSession.playerId]);
