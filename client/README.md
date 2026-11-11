@@ -36,17 +36,21 @@ Setelah mengganti versi dependency, hentikan Vite yang masih berjalan dengan `Ct
 ```text
 __test__/                   Pemeriksaan integrasi data server dengan komponen
 src/
+  main.jsx                  Root React, GameProvider, dan stylesheet global
   App.jsx                   Router: /, /rooms/:code, /rooms/:code/result
   constant/                 URL server, fase, batas, pesan error
   socket/index.js           Instance socket.io-client
   contexts/GameContext.js   Context dan hook useGame
   contexts/GameProvider.jsx Sesi, socket, snapshot publik, state privat, aksi
-  views/                    HomePage, RoomPage, ResultPage, NotFoundPage
+  pages/BaseLayout.jsx      ConnectionBanner dan container bersama dengan Outlet
+  pages/                    HomePage, RoomPage, ResultPage, NotFoundPage
   components/RoomGate.jsx   Sesi kedaluwarsa, tautan langsung, resume
   components/room/          Header, pemain, kata, clue, chat
   components/phases/        Lobby, WordReveal, Clue, Discussion, Voting
-  helpers/                  API, session, room, toast, countdown
+  helpers/                  Session, room, toast, countdown, keluar room
 ```
+
+Halaman berada di `pages/` dan bagian UI yang dipakai halaman berada di `components/`, mengikuti pola GC02 dan Rewear. `App.jsx` mendefinisikan rute; `BaseLayout` menampilkan `Outlet`. `GameProvider` dipasang satu kali di `main.jsx` agar sesi tetap tersedia ketika halaman berubah. Pemanggilan REST kategori memakai Axios langsung di `LobbyPhase` dengan `async/await` dan `try/catch`. Komunikasi socket bersama tetap dikelola Context.
 
 ## Kontrak integrasi
 

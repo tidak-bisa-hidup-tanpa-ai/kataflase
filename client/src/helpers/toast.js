@@ -1,5 +1,4 @@
 import Toastify from 'toastify-js'
-import 'toastify-js/src/toastify.css'
 
 const COLORS = {
   info: '#1c1b3f',

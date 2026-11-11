@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import axios from 'axios'
 import { errorMessage } from '../../constant/errors'
 import { MAX_PLAYERS, MIN_PLAYERS, RANDOM_CATEGORY } from '../../constant/game'
 import { useGame } from '../../contexts/GameContext'
-import { getGameOptions } from '../../helpers/api'
+import { SERVER_URL } from '../../constant/url'
 import { toast } from '../../helpers/toast'
 import { useLeaveRoom } from '../../helpers/useLeaveRoom'
 import AppHeader from '../AppHeader'
@@ -29,13 +30,19 @@ export default function LobbyPhase() {
 
   useEffect(() => {
     let active = true
-    getGameOptions()
-      .then((list) => {
-        if (active) setOptions(list)
-      })
-      .catch(() => {
+    async function fetchGameOptions() {
+      try {
+        const { data } = await axios.get(`${SERVER_URL}/api/game-options`, { timeout: 5000 })
+        const categories = data.data.categories
+          .filter((id) => id !== RANDOM_CATEGORY.id)
+          .map((id) => ({ id, label: id }))
+        if (active) setOptions([RANDOM_CATEGORY, ...categories])
+      } catch {
         if (active) toast('Gagal memuat kategori. "Acak" tetap bisa dipakai.', 'error')
-      })
+      }
+    }
+
+    fetchGameOptions()
     return () => {
       active = false
     }

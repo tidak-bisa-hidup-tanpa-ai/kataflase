@@ -20,7 +20,7 @@ before(async () => {
   ;({ GameContext } = await vite.ssrLoadModule('/src/contexts/GameContext.js'))
   ;({ default: CluePhase } = await vite.ssrLoadModule('/src/components/phases/CluePhase.jsx'))
   ;({ default: VotingPhase } = await vite.ssrLoadModule('/src/components/phases/VotingPhase.jsx'))
-  ;({ default: ResultPage } = await vite.ssrLoadModule('/src/views/ResultPage.jsx'))
+  ;({ default: ResultPage } = await vite.ssrLoadModule('/src/pages/ResultPage.jsx'))
 })
 
 after(async () => {
