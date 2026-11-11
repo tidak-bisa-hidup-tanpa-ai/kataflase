@@ -35,6 +35,7 @@ function emitRoomState(io, room) {
     hostId: room.hostId,
     phase: room.phase,
     revision: room.revision,
+    serverNow: new Date().toISOString(),
     isStarting: room.isStarting,
     players: players.map((member) => ({
       playerId: member.id,

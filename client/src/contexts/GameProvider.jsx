@@ -65,11 +65,15 @@ export function GameProvider({ children }) {
   const [expiredReason, setExpiredReason] = useState(null)
 
   const sessionRef = useRef(session)
-  const clockOffsetRef = useRef(0)
+  const serverClockRef = useRef(null)
   // true setelah socket saat ini terikat ke sesi (resume/create/join sukses).
   const boundRef = useRef(false)
 
-  const now = useCallback(() => Date.now() + clockOffsetRef.current, [])
+  const now = useCallback(() => {
+    const clock = serverClockRef.current
+    if (!clock) return Date.now()
+    return clock.serverTime + (performance.now() - clock.receivedAt)
+  }, [])
 
   const updateSession = useCallback((next) => {
     sessionRef.current = next
@@ -100,7 +104,7 @@ export function GameProvider({ children }) {
     if (next.serverNow) {
       const serverTime = Date.parse(next.serverNow)
       if (!Number.isNaN(serverTime)) {
-        clockOffsetRef.current = serverTime - Date.now()
+        serverClockRef.current = { serverTime, receivedAt: performance.now() }
       }
     }
 

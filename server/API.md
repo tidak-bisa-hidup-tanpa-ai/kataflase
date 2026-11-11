@@ -48,7 +48,7 @@ ACK sukses untuk create, join, atau resume hanya dikirim ke socket yang meminta.
 
 ACK gagal memakai `{ "ok": false, "error": { "code": "ROOM_FULL", "message": "Room sudah penuh." } }`. Kode lain yang dapat diterima adalah `INVALID_NICKNAME`, `INVALID_ROOM_CODE`, `ROOM_CAPACITY`, `ROOM_CREATE_LIMIT`, `ALREADY_IN_ROOM`, `ROOM_NOT_FOUND`, `ROUND_IN_PROGRESS`, `NOT_IN_ROOM`, `SESSION_EXPIRED`, dan `INTERNAL_SERVER_ERROR`.
 
-Server mengirim `room:state` terbaru ke anggota room setelah create, join, resume, leave, atau pembaruan presence. `online` menunjukkan status koneksi saat snapshot dibuat.
+Server mengirim `room:state` terbaru ke anggota room setelah create, join, resume, leave, atau pembaruan presence. `online` menunjukkan status koneksi saat snapshot dibuat. `serverNow` berisi waktu server saat snapshot dikirim dalam format ISO dan menjadi acuan hitung mundur.
 
 Saat koneksi putus di lobby, pemain ditandai offline. Server menahan slot selama 30 detik, lalu melepasnya jika pemain masih offline dan room masih di fase `WAITING`. Saat ronde berjalan, pemain offline tetap tercatat. Jika host keluar atau putus koneksi, pemain online yang paling awal bergabung mengambil alih.
 
@@ -60,6 +60,7 @@ Room dihapus saat anggota terakhir keluar atau sesi lobby terakhir habis. Di lua
   "hostId": 1,
   "phase": "WAITING",
   "revision": 1,
+  "serverNow": "2026-11-11T02:59:50.000Z",
   "isStarting": false,
   "players": [{ "playerId": 1, "nickname": "Ari", "online": true }]
 }
