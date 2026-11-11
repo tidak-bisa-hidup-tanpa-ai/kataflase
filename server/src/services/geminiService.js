@@ -5,9 +5,14 @@
  * Bertanggung jawab atas:
  * 1. Memanggil Gemini API dengan prompt terstruktur untuk menghasilkan { wordA, wordB }
  * 2. Memaksa output berformat JSON murni
- * 3. Membatasi waktu tunggu maksimal 5 detik (sesuai ADR)
- * 4. Memvalidasi hasil respons AI
+ * 3. Membatasi waktu tunggu maksimal (sesuai ADR)
+ * 4. Sanitasi & validasi ketat hasil respons AI
  * 5. Fallback ke word bank lokal jika AI gagal, timeout, atau invalid
+ *
+ * GUARDRAIL KEAMANAN:
+ * - extractJsonBlock(): Regex stripping markdown fence sebelum JSON.parse
+ * - Identical word detection setelah normalisasi
+ * - Repeated pair detection (inklusif urutan terbalik)
  */
 
 require("dotenv").config();
@@ -22,6 +27,29 @@ const MODEL_NAME = "gemini-3.5-flash-lite";
 
 // Timeout maksimal dalam milidetik (10 detik untuk testing jaringan lokal)
 const AI_TIMEOUT_MS = 10000;
+
+/**
+ * GUARDRAIL: Ekstrak blok JSON murni { ... } dari teks respons AI.
+ * Menghapus segala bentuk pembungkus markdown (```json ... ```),
+ * teks pengantar, atau komentar yang ditambahkan AI di luar JSON.
+ *
+ * Contoh input yang ditangani:
+ *   - '```json\n{"wordA":"Kopi","wordB":"Teh"}\n```'
+ *   - 'Here is the output: {"wordA":"Kopi","wordB":"Teh"}'
+ *   - '{"wordA":"Kopi","wordB":"Teh"}'  (sudah bersih)
+ *
+ * @param {string} rawText - Teks mentah dari respons Gemini
+ * @returns {string | null} String JSON bersih atau null jika tidak ditemukan
+ */
+function extractJsonBlock(rawText) {
+  if (typeof rawText !== "string" || rawText.trim().length === 0) {
+    return null;
+  }
+
+  // Regex menangkap objek JSON terluar dari kurung kurawal pertama hingga terakhir
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  return jsonMatch ? jsonMatch[0].trim() : null;
+}
 
 /**
  * Membangun prompt yang memaksa Gemini menghasilkan pasangan kata seru
@@ -90,30 +118,47 @@ async function callGeminiAPI(category, previousPair = null) {
 }
 
 /**
- * Mem-parse teks JSON dari Gemini dan memvalidasi strukturnya.
- * Melempar error jika format tidak valid atau kata tidak memenuhi syarat.
+ * GUARDRAIL: Mem-parse teks JSON dari Gemini dengan sanitasi ketat.
+ *
+ * Langkah pengamanan:
+ * 1. extractJsonBlock() — strip markdown fence dan teks di luar JSON
+ * 2. JSON.parse() — parsing aman setelah sanitasi
+ * 3. Tipe data check — wordA & wordB harus string non-kosong
+ * 4. Identical word check — normalisasi lowercase + trim lalu bandingkan
+ * 5. Repeated pair check — cegah duplikasi ronde sebelumnya (inklusif urutan terbalik)
  *
  * @param {string} rawText - Teks mentah dari respons Gemini
  * @param {{ wordA: string, wordB: string } | null} previousPair
  * @returns {{ wordA: string, wordB: string }}
  */
 function parseAndValidateResponse(rawText, previousPair = null) {
+  // GUARDRAIL 1: Ekstraksi JSON dari kemungkinan bungkus markdown
+  const cleanJsonString = extractJsonBlock(rawText);
+  if (!cleanJsonString) {
+    throw new Error(
+      `AI_NO_JSON_FOUND: Tidak ditemukan kurung kurawal JSON dalam respons: "${rawText.substring(0, 200)}"`
+    );
+  }
+
   let parsed;
 
   try {
-    parsed = JSON.parse(rawText);
-  } catch {
-    throw new Error(`AI_INVALID_JSON: Tidak bisa parse JSON dari: "${rawText}"`);
+    // GUARDRAIL 2: Parse hanya string yang sudah dibersihkan
+    parsed = JSON.parse(cleanJsonString);
+  } catch (err) {
+    throw new Error(
+      `AI_MALFORMED_JSON: Gagal parsing JSON setelah sanitasi (${err.message})`
+    );
   }
 
   const { wordA, wordB } = parsed;
 
-  // Validasi 1: Kedua field harus ada dan berupa string tidak kosong
+  // GUARDRAIL 3: Kedua field harus ada dan berupa string tidak kosong
   if (
     typeof wordA !== "string" ||
     typeof wordB !== "string" ||
-    wordA.trim() === "" ||
-    wordB.trim() === ""
+    wordA.trim().length === 0 ||
+    wordB.trim().length === 0
   ) {
     throw new Error("AI_INVALID_WORDS: wordA atau wordB kosong atau bukan string.");
   }
@@ -121,12 +166,13 @@ function parseAndValidateResponse(rawText, previousPair = null) {
   const normalizedA = wordA.trim().toLowerCase();
   const normalizedB = wordB.trim().toLowerCase();
 
-  // Validasi 2: Kedua kata tidak boleh identik setelah normalisasi
+  // GUARDRAIL 4: Kedua kata tidak boleh identik setelah normalisasi
+  // (AI terkadang mengalami repetition loop: "Kucing" vs "kucing")
   if (normalizedA === normalizedB) {
     throw new Error("AI_IDENTICAL_WORDS: wordA dan wordB identik setelah normalisasi.");
   }
 
-  // Validasi 3: Tidak boleh mengulang pasangan ronde sebelumnya (inklusif urutan terbalik)
+  // GUARDRAIL 5: Tidak boleh mengulang pasangan ronde sebelumnya (inklusif urutan terbalik)
   if (previousPair) {
     const prevA = previousPair.wordA.trim().toLowerCase();
     const prevB = previousPair.wordB.trim().toLowerCase();
@@ -172,5 +218,7 @@ async function generateWordPair(category, previousPair = null) {
 
 module.exports = {
   generateWordPair,
+  // Ekspor untuk keperluan unit testing
+  extractJsonBlock,
+  parseAndValidateResponse,
 };
-
