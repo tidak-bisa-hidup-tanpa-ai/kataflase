@@ -177,8 +177,96 @@ async function generateWordPair(category, previousPair = null, { allowWordBank =
   return { ...getRandomWordPair(category, previousPair), source: "wordbank" };
 }
 
+/**
+ * Membangun prompt untuk menghasilkan 1 saran petunjuk yang aman dan ambigu.
+ *
+ * @param {string} secretWord - Kata rahasia pemain
+ * @param {string} category - Kategori permainan
+ * @returns {string} Prompt lengkap
+ */
+function buildHintPrompt(secretWord, category) {
+  return `Kamu adalah asisten petunjuk untuk game social deduction "Kataflase".
+Seorang pemain memegang kata rahasia: "${secretWord}" dalam kategori: "${category}".
+Pemain ini sedang kebingungan dan meminta ide petunjuk (clue) singkat (1-3 kata) untuk gilirannya.
+
+ATURAN KETAT:
+1. DILARANG KERAS menyebutkan kata "${secretWord}" atau bagian dari kata tersebut.
+2. Petunjuk harus KREATIF dan AMBIGU (contoh: jika kata "Kopi", petunjuk bisa "aroma pagi", "begadang", "seduh").
+3. Petunjuk TIDAK boleh berupa sinonim langsung atau terlalu gamblang agar pemain lain tidak langsung tahu kata rahasianya.
+4. Output HARUS berupa JSON murni tanpa markdown:
+{"hint": "petunjuk singkat di sini"}`;
+}
+
+/**
+ * Memanggil Gemini API untuk menghasilkan saran petunjuk (clue hint).
+ *
+ * @param {{ name: string, timeout: number }} options
+ * @param {string} secretWord
+ * @param {string} category
+ * @returns {Promise<string>}
+ */
+async function callGeminiHint({ name, timeout }, secretWord, category) {
+  const model = genAI.getGenerativeModel({
+    model: name,
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 60,
+      temperature: 0.8,
+    },
+  }, { timeout });
+
+  const prompt = buildHintPrompt(secretWord, category);
+  const result = await model.generateContent(prompt);
+  const rawText = result.response.text().trim();
+
+  const cleanJson = extractJsonBlock(rawText);
+  if (!cleanJson) throw new Error("AI_NO_JSON_FOUND: Respons hint tidak berisi JSON.");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanJson);
+  } catch {
+    throw new Error("AI_INVALID_JSON: Format JSON hint tidak valid.");
+  }
+
+  if (!parsed.hint || typeof parsed.hint !== "string" || !parsed.hint.trim()) {
+    throw new Error("AI_INVALID_HINT: Teks hint kosong atau bukan string.");
+  }
+
+  return parsed.hint.trim();
+}
+
+/**
+ * Menghasilkan 1 saran petunjuk cerdas dan aman untuk pemain yang sedang giliran.
+ *
+ * @param {string} secretWord - Kata rahasia milik pemain
+ * @param {string} category - Kategori permainan
+ * @returns {Promise<{ hint: string, source: "ai" | "fallback" }>}
+ */
+async function generateClueHint(secretWord, category) {
+  if (apiKey) {
+    for (const model of models) {
+      if (!allowAiRequest()) break;
+      try {
+        const hint = await callGeminiHint(model, secretWord, category);
+        console.info(`[Gemini Hint] Berhasil dengan model: ${model.name}`);
+        return { hint, source: "ai" };
+      } catch (error) {
+        console.warn(`[Gemini Hint] ${model.name} gagal: ${error.message}`);
+      }
+    }
+  }
+
+  // Fallback awal (akan diperkaya di Commit 2)
+  return {
+    hint: "Pikirkan ciri fisik, rasa, atau momen saat kamu menggunakannya.",
+    source: "fallback",
+  };
+}
+
 module.exports = {
   generateWordPair,
+  generateClueHint,
   extractJsonBlock,
   parseAndValidateResponse,
 };
