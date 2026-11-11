@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useParams } from 'react-router'
 import RoomGate from '../components/RoomGate'
+import Mascot from '../components/ui/Mascot'
 import { errorMessage } from '../constant/errors'
 import { PHASES } from '../constant/game'
 import { useGame } from '../contexts/GameContext'
@@ -65,6 +66,7 @@ function ResultView() {
 
       <div className="lg:mt-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-16">
       <section className="relative">
+      <div className="flex items-end justify-between gap-3">
       <p
         className={`display relative mt-5 inline-block -rotate-3 rounded-lg border-2 border-ink px-3 py-1.5 text-base tracking-tight uppercase shadow-[3px_3px_0_var(--color-ink)] ${
           impostorWins ? 'bg-flame' : 'bg-sun'
@@ -72,6 +74,14 @@ function ResultView() {
       >
         {impostorWins ? 'Impostor menang' : 'Pemain biasa menang'}
       </p>
+      <Mascot
+        impostor
+        mood={impostorWins ? 'smug' : 'caught'}
+        word={words.get(result.impostorId) ?? ''}
+        className="relative -mb-4 w-20 shrink-0 motion-safe:animate-bob lg:w-28"
+        title={impostorWins ? 'Kartu impostor lolos' : 'Kartu impostor tertangkap'}
+      />
+      </div>
 
       <p className="label relative mt-5">Impostornya adalah</p>
       <h1 className="display misreg relative mt-1 text-[64px] leading-[0.95] wrap-break-word lg:text-[104px]">
