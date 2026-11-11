@@ -21,9 +21,15 @@ npm test
 npm run build
 ```
 
-Tes client memeriksa render clue, kandidat voting, dan hasil menggunakan bentuk snapshot server. Pengujian permainan lengkap tetap dilakukan dengan server dan beberapa browser.
+Tes client memeriksa render clue, kandidat voting, hasil menggunakan snapshot server, serta CSS layout mobile dan desktop yang benar-benar dihasilkan saat build. Pengujian permainan lengkap tetap dilakukan dengan server dan beberapa browser.
 
 Fallback rute SPA tersedia untuk Netlify (`public/_redirects`) dan Vercel (`vercel.json`). Saat deployment, isi `VITE_SERVER_URL` sebelum build dan sesuaikan `CLIENT_ORIGIN` pada server dengan origin client.
+
+## Kompatibilitas Tailwind di Windows
+
+`tailwindcss` dan `@tailwindcss/vite` dikunci ke `4.2.4`. Pada Windows yang dipakai untuk pengujian, Application Control memblokir pemindai native versi `4.3.5`; fallback-nya tidak membaca source sehingga layout kehilangan utility CSS meskipun build berhasil. Versi `4.2.4` sudah diuji menghasilkan utility tersebut tanpa mengubah pengaturan keamanan Windows.
+
+Setelah mengganti versi dependency, hentikan Vite yang masih berjalan dengan `Ctrl+C`, lalu jalankan `npm run dev -- --force`. Jika memperbarui Tailwind nanti, perbarui kedua paket bersama dan jalankan `npm test` untuk memastikan utility CSS tetap terbentuk.
 
 ## Struktur
 
