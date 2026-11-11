@@ -53,6 +53,19 @@ Jalankan `npm test` dari folder server untuk menguji keamanan dan alur Socket.IO
 
 Deploy server sebagai satu instance. Refresh browser atau reconnect dapat memulihkan sesi selama server masih berjalan. Restart, crash, atau redeploy server menghapus seluruh room dan ronde. Kode lama tidak berlaku; host membuat room baru dan pemain lain bergabung memakai kode baru. Main Lagi setelah ronde normal tetap memakai kode room yang sama.
 
+## Menjalankan client
+
+Biarkan server berjalan, lalu buka terminal lain:
+
+```sh
+cd client
+npm ci
+cp -n .env.example .env
+npm run dev
+```
+
+Client berjalan di `http://localhost:5173` dan memakai server `http://localhost:3000`. Atur `VITE_SERVER_URL` di environment client jika URL server berbeda, serta `CLIENT_ORIGIN` di server sesuai origin client. Setup, pemeriksaan, dan kontrak integrasi dijelaskan di [README client](client/README.md).
+
 ## Mulai kontribusi
 
 1. Clone repo, lalu pindah ke branch `development`.
