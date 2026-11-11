@@ -12,7 +12,7 @@
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const createRateLimit = require("./rateLimit");
-const { getRandomWordPair, getWordPairHash } = require("./wordBank");
+const { getRandomWordPair, getWordPairHash, getFallbackHint } = require("./wordBank");
 
 const allowAiRequest = createRateLimit(12);
 const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -177,8 +177,230 @@ async function generateWordPair(category, previousPair = null, { allowWordBank =
   return { ...getRandomWordPair(category, previousPair), source: "wordbank" };
 }
 
+/**
+ * Membangun prompt untuk menghasilkan 1 saran petunjuk yang aman dan ambigu.
+ *
+ * @param {string} secretWord - Kata rahasia pemain
+ * @param {string} category - Kategori permainan
+ * @returns {string} Prompt lengkap
+ */
+function buildHintPrompt(secretWord, category) {
+  return `Kamu adalah asisten petunjuk untuk game social deduction "Kataflase".
+Seorang pemain memegang kata rahasia: "${secretWord}" dalam kategori: "${category}".
+Pemain ini sedang kebingungan dan meminta ide petunjuk (clue) singkat (1-3 kata) untuk gilirannya.
+
+ATURAN KETAT:
+1. DILARANG KERAS menyebutkan kata "${secretWord}" atau bagian dari kata tersebut.
+2. Petunjuk harus KREATIF dan AMBIGU (contoh: jika kata "Kopi", petunjuk bisa "aroma pagi", "begadang", "seduh").
+3. Petunjuk TIDAK boleh berupa sinonim langsung atau terlalu gamblang agar pemain lain tidak langsung tahu kata rahasianya.
+4. Output HARUS berupa JSON murni tanpa markdown:
+{"hint": "petunjuk singkat di sini"}`;
+}
+
+/**
+ * Memanggil Gemini API untuk menghasilkan saran petunjuk (clue hint).
+ *
+ * @param {{ name: string, timeout: number }} options
+ * @param {string} secretWord
+ * @param {string} category
+ * @returns {Promise<string>}
+ */
+async function callGeminiHint({ name, timeout }, secretWord, category) {
+  const model = genAI.getGenerativeModel({
+    model: name,
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 60,
+      temperature: 0.8,
+    },
+  }, { timeout });
+
+  const prompt = buildHintPrompt(secretWord, category);
+  const result = await model.generateContent(prompt);
+  const rawText = result.response.text().trim();
+
+  const cleanJson = extractJsonBlock(rawText);
+  if (!cleanJson) throw new Error("AI_NO_JSON_FOUND: Respons hint tidak berisi JSON.");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanJson);
+  } catch {
+    throw new Error("AI_INVALID_JSON: Format JSON hint tidak valid.");
+  }
+
+  if (!parsed.hint || typeof parsed.hint !== "string" || !parsed.hint.trim()) {
+    throw new Error("AI_INVALID_HINT: Teks hint kosong atau bukan string.");
+  }
+
+  const hint = parsed.hint.trim();
+  const normalize = (value) => value.normalize("NFKC").toLocaleLowerCase("id-ID");
+  const normalizedHint = normalize(hint);
+  const secretParts = normalize(secretWord).match(/[\p{L}\p{N}]+/gu) || [];
+  const hintParts = normalizedHint.match(/[\p{L}\p{N}]+/gu) || [];
+  if (secretParts.some((part) => hintParts.includes(part))) {
+    throw new Error("AI_HINT_LEAK: Hint mengandung kata rahasia.");
+  }
+
+  return hint;
+}
+
+/**
+ * Menghasilkan 1 saran petunjuk cerdas dan aman untuk pemain yang sedang giliran.
+ *
+ * @param {string} secretWord - Kata rahasia milik pemain
+ * @param {string} category - Kategori permainan
+ * @returns {Promise<{ hint: string, source: "ai" | "fallback" }>}
+ */
+async function generateClueHint(secretWord, category) {
+  if (apiKey) {
+    for (const model of models) {
+      if (!allowAiRequest()) break;
+      try {
+        const hint = await callGeminiHint(model, secretWord, category);
+        console.info(`[Gemini Hint] Berhasil dengan model: ${model.name}`);
+        return { hint, source: "ai" };
+      } catch (error) {
+        console.warn(`[Gemini Hint] ${model.name} gagal: ${error.message}`);
+      }
+    }
+  }
+
+  // Fallback offline berbasis kategori jika AI gagal atau offline
+  const fallbackHint = getFallbackHint(category);
+  return {
+    hint: fallbackHint,
+    source: "fallback",
+  };
+}
+
+/**
+ * Membangun prompt ulasan jenaka untuk fase RESULT.
+ *
+ * @param {object} gameData
+ * @returns {string} Prompt lengkap
+ */
+function buildRecapPrompt({ winner, impostorNickname, majorityWord, impostorWord, clues, reason }) {
+  const clueSummary = Array.isArray(clues) && clues.length > 0
+    ? clues.map((c) => `- ${c.nickname || "Pemain"}: "${c.text || ""}"`).join("\n")
+    : "Tidak ada petunjuk yang terekam.";
+
+  return `Kamu adalah komentator lucu dan cerdas untuk game social deduction "Kataflase".
+Ronde baru saja berakhir dengan detail:
+- Pemenang: ${winner === "CIVILIANS" ? "Warga / Pemain Biasa" : "Impostor"}
+- Impostor: ${impostorNickname || "Seseorang"} (Kata impostor: "${impostorWord}")
+- Kata Mayoritas Warga: "${majorityWord}"
+- Alasan Kemenangan: ${reason || "-"}
+- Petunjuk yang diberikan pemain:
+${clueSummary}
+
+Tugasmu:
+Buatlah 1-2 kalimat ulasan singkat yang jenaka, seru, dan menghibur tentang ronde ini.
+Gaya bahasa: Santai, gaul, ramah anak muda Indonesia, ceria, dan tanpa emoji berlebihan.
+
+Output WAJIB berupa JSON murni tanpa markdown:
+{"recap": "komentar 1-2 kalimat di sini"}`;
+}
+
+/**
+ * Memanggil Gemini API untuk menghasilkan ulasan komentar ronde.
+ *
+ * @param {{ name: string, timeout: number }} options
+ * @param {object} gameData
+ * @returns {Promise<string>}
+ */
+async function callGeminiRecap({ name, timeout }, gameData) {
+  const model = genAI.getGenerativeModel({
+    model: name,
+    generationConfig: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 120,
+      temperature: 0.9,
+    },
+  }, { timeout });
+
+  const prompt = buildRecapPrompt(gameData);
+  const result = await model.generateContent(prompt);
+  const rawText = result.response.text().trim();
+
+  const cleanJson = extractJsonBlock(rawText);
+  if (!cleanJson) throw new Error("AI_NO_JSON_FOUND: Respons recap tidak berisi JSON.");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanJson);
+  } catch {
+    throw new Error("AI_INVALID_JSON: Format JSON recap tidak valid.");
+  }
+
+  if (!parsed.recap || typeof parsed.recap !== "string" || !parsed.recap.trim()) {
+    throw new Error("AI_INVALID_RECAP: Teks recap kosong atau bukan string.");
+  }
+
+  return parsed.recap.trim();
+}
+
+/**
+ * Template ulasan fallback offline jika AI tidak merespons.
+ *
+ * @param {object} gameData
+ * @returns {string}
+ */
+function getFallbackRecap({ winner, impostorNickname, majorityWord, impostorWord }) {
+  const nick = impostorNickname || "Impostor";
+  if (winner === "CIVILIANS") {
+    const templates = [
+      `Warga jeli banget! Penyamaran ${nick} dengan kata "${impostorWord}" langsung terbongkar oleh kubu "${majorityWord}".`,
+      `Insting detektif warga patut diacungi jempol! ${nick} akhirnya tertangkap basah di sesi voting.`,
+      `Permainan kompak dari warga! ${nick} mencoba berbaur tapi petunjuknya malah bikin semua orang curiga.`,
+    ];
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  const templates = [
+    `Akting kelas atas dari ${nick}! Sukses mengecoh seluruh warga dan mengamankan kemenangan dengan kata "${impostorWord}".`,
+    `Warga terkecoh total! ${nick} berhasil lolos santai tanpa dicurigai sama sekali di ronde ini.`,
+    `Kemenangan mulus buat ${nick}! Perbedaan "${majorityWord}" dan "${impostorWord}" berhasil disamarkan dengan sempurna.`,
+  ];
+  return templates[Math.floor(Math.random() * templates.length)];
+}
+
+/**
+ * Menghasilkan ulasan ringkasan jenaka di akhir ronde (fase RESULT).
+ *
+ * @param {object} gameData
+ * @param {string} gameData.winner - "CIVILIANS" atau "IMPOSTOR"
+ * @param {string} gameData.impostorNickname - Nama pemain yang menjadi impostor
+ * @param {string} gameData.majorityWord - Kata rahasia warga
+ * @param {string} gameData.impostorWord - Kata rahasia impostor
+ * @param {Array<{ nickname: string, text: string }>} [gameData.clues] - Daftar petunjuk
+ * @param {string} [gameData.reason] - Alasan kemenangan sistem
+ * @returns {Promise<{ recap: string, source: "ai" | "fallback" }>}
+ */
+async function generateMatchRecap(gameData = {}) {
+  if (apiKey) {
+    for (const model of models) {
+      if (!allowAiRequest()) break;
+      try {
+        const recap = await callGeminiRecap(model, gameData);
+        console.info(`[Gemini Recap] Berhasil dengan model: ${model.name}`);
+        return { recap, source: "ai" };
+      } catch (error) {
+        console.warn(`[Gemini Recap] ${model.name} gagal: ${error.message}`);
+      }
+    }
+  }
+
+  return {
+    recap: getFallbackRecap(gameData),
+    source: "fallback",
+  };
+}
+
 module.exports = {
   generateWordPair,
+  generateClueHint,
+  generateMatchRecap,
   extractJsonBlock,
   parseAndValidateResponse,
 };
