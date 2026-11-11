@@ -1,12 +1,12 @@
 # Kataflase Server
 
-Jalankan semua perintah setup dari folder `server`. Pasang dependency dengan `npm ci`, salin `.env.example` menjadi `.env` jika belum ada, lalu isi `GEMINI_API_KEY` jika ingin memakai AI. Jalankan `npm start`. Port bawaan adalah `3000` dan origin frontend bawaan adalah `http://localhost:5173`. Gunakan `PORT` dan `CLIENT_ORIGIN` di environment server untuk mengganti keduanya.
+Jalankan semua perintah setup dari folder `server`. Pasang dependency dengan `npm ci`, salin `.env.example` menjadi `.env` jika belum ada, lalu isi `GEMINI_API_KEY` jika ingin memakai AI. Jalankan `npm start`. Port bawaan adalah `3000`. Origin frontend bawaan adalah `http://localhost:5173` saat development dan `https://kataflase.dipatipaw.web.id` saat `NODE_ENV=production`. Gunakan `PORT` dan `CLIENT_ORIGIN` di environment server untuk mengganti keduanya.
 
 Express dan Socket.IO menggunakan port yang sama.
 
 ## Penyimpanan room
 
-Room, sesi pemain, dan ronde disimpan di memory satu proses Node.js. Aplikasi tidak memakai database. Saat deployment, gunakan satu instance server dan atur `CLIENT_ORIGIN` serta `GEMINI_API_KEY` melalui environment hosting. Hosting dapat menyediakan `PORT`. Handshake Socket.IO dengan header `Origin` hanya menerima nilai yang sama dengan `CLIENT_ORIGIN`. Klien tanpa header `Origin` tetap tunduk pada aturan sesi dan batas percobaan.
+Room, sesi pemain, dan ronde disimpan di memory satu proses Node.js. Aplikasi tidak memakai database. Saat deployment, gunakan satu instance server dan atur `CLIENT_ORIGIN` serta `GEMINI_API_KEY` melalui environment hosting. Hosting dapat menyediakan `PORT`. Handshake Socket.IO dengan header `Origin` hanya menerima origin frontend yang dikonfigurasi server. Klien tanpa header `Origin` tetap tunduk pada aturan sesi dan batas percobaan.
 
 Restart, crash, atau redeploy menghapus semua room dan ronde. Kode room lama tidak dapat digunakan lagi. Client yang mencoba `room:resume` dengan sesi lama menerima `SESSION_EXPIRED`; `room:join` ke room yang hilang menerima `ROOM_NOT_FOUND`. Host membuat room baru dan pemain lain memasukkan kode baru. Refresh browser atau reconnect tetap dapat memulihkan sesi selama proses server yang sama masih berjalan dan sesi valid.
 

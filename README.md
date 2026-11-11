@@ -81,7 +81,7 @@ Client berjalan di `http://localhost:5173` dan memakai server `http://localhost:
 ## Rilis EC2 dan Vercel
 
 1. Di Vercel, pilih Framework Preset **Vite**, Root Directory `client`, dan Production Branch `main`. Build produksi memakai `https://kataflase-server.dipatipaw.web.id` untuk REST dan Socket.IO. Jika `VITE_SERVER_URL` sudah diatur, pastikan nilainya memakai domain tersebut.
-2. Di EC2, isi `CLIENT_ORIGIN` pada bagian `env` di file konfigurasi PM2 yang sudah dipakai. Nilainya adalah URL frontend produksi, misalnya `https://kataflase.vercel.app`, tanpa path. Dengan `NODE_ENV=production`, server membaca konfigurasi dari environment proses PM2.
+2. Di EC2, gunakan `CLIENT_ORIGIN: "https://kataflase.dipatipaw.web.id"` pada bagian `env` di file konfigurasi PM2 yang sudah dipakai. Ini juga origin bawaan saat `NODE_ENV=production`. Nilai `CLIENT_ORIGIN` dari PM2 menggantikan bawaan.
 3. Setelah PR rilis masuk ke `main`, jalankan dari folder clone di EC2:
 
    ```sh
@@ -90,7 +90,7 @@ Client berjalan di `http://localhost:5173` dan memakai server `http://localhost:
    ```
 
    Jalankan `npm ci` dari `server` jika dependency berubah. Dari folder konfigurasi PM2, jalankan `pm2 restart ecosystem.config.js --only kataflase --update-env`. Restart menghapus room aktif. Vercel yang terhubung ke GitHub membangun ulang client dari `main` secara otomatis.
-4. Cek `/health` pada domain server, lalu buka URL produksi Vercel. Buat satu room dengan tiga pemain dan uji undangan, kategori, **Minta Saran**, serta halaman hasil.
+4. Cek `/health` pada domain server, lalu buka `https://kataflase.dipatipaw.web.id`. Buat satu room dengan tiga pemain dan uji undangan, kategori, **Minta Saran**, serta halaman hasil.
 
 ## Workflow pengembangan lanjutan
 
