@@ -254,7 +254,7 @@ export function GameProvider({ children }) {
   )
 
   const startGame = useCallback(
-    (category) => act('game:start', { category }),
+    (category, customCategory) => act('game:start', { category, customCategory }),
     [act],
   )
 

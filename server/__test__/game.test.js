@@ -91,7 +91,13 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
   for (let i = 1; i < team.length; i++) {
     await enter(team[i], "room:join", { code: first.code.toLowerCase(), nickname: `Pemain ${i}` });
   }
-  await error(team[1], "game:start", {}, "HOST_ONLY");
+  const custom = { category: "custom", customCategory: "Futsal" };
+  await error(team[1], "game:start", custom, "HOST_ONLY");
+  for (const customCategory of [undefined, " ", 123, "a".repeat(51), "Tema\nLain"]) {
+    await error(team[0], "game:start", { ...custom, customCategory }, "INVALID_CUSTOM_CATEGORY");
+  }
+  await error(team[0], "game:start", custom, "CUSTOM_CATEGORY_UNAVAILABLE");
+  await until(() => state(team[0])?.phase === "WAITING" && !state(team[0]).isStarting, "custom start unlocked");
   const outsider = await connect();
   await enter(outsider, "room:create", { nickname: "Room lain" });
   const started = await send(team[0], "game:start", { category: "makanan" });

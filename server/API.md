@@ -83,13 +83,13 @@ Semua aksi memerlukan callback ACK. Identitas pemain diambil dari sesi socket; j
 
 | Event | Payload | Hasil |
 | --- | --- | --- |
-| `game:start` | `{ "category": "makanan" }` | Host memulai ronde ketika 3–6 anggota online. Jika kategori tidak dikirim, gunakan `acak`. ACK sukses: `{ "ok": true, "data": { "roundId": "<uuid>" } }`. |
+| `game:start` | `{ "category": "makanan" }` | Host memulai ronde ketika 3–6 anggota online. Jika kategori tidak dikirim, gunakan `acak`. Untuk kategori sendiri, kirim `{ "category": "custom", "customCategory": "Futsal" }` dengan nama 1–50 karakter dalam satu baris. ACK sukses: `{ "ok": true, "data": { "roundId": "<uuid>" } }`. |
 | `clue:submit` | `{ "roundId": "<uuid>", "text": "Hangat" }` | Satu clue, maksimal 100 karakter, pada giliran sendiri. Kata sendiri atau bagiannya yang dipisah spasi/simbol, seperti `k o p i` dan `k.o.p.i`, ditolak. |
 | `chat:send` | `{ "roundId": "<uuid>", "text": "Menurutku Ari" }` | Pesan 1–500 karakter selama `DISCUSSION`. Riwayat menyimpan 50 pesan terakhir. |
 | `vote:submit` | `{ "roundId": "<uuid>", "targetPlayerId": 2 }` | Target memakai ID angka dari daftar peserta. Satu suara terkunci; tidak boleh memilih diri sendiri. |
 | `game:restart` | `{ "roundId": "<uuid>" }` | Host kembali dari `RESULT` ke `WAITING`, menghapus data ronde, mempertahankan kode room dan sesi anggota. |
 
-ACK sukses selain start: `{ "ok": true }`. ACK gagal mengikuti format lobby. Kode game meliputi `HOST_ONLY`, `PLAYERS_NOT_READY`, `INVALID_CATEGORY`, `ROUND_IN_PROGRESS`, `START_CANCELLED`, `INVALID_ROUND`, `NOT_A_PARTICIPANT`, `INVALID_PHASE`, `ACTION_EXPIRED`, `NOT_YOUR_TURN`, `ALREADY_SUBMITTED`, `INVALID_CLUE`, `INVALID_MESSAGE`, `ALREADY_VOTED`, `CANNOT_VOTE_SELF`, dan `INVALID_TARGET`.
+ACK sukses selain start: `{ "ok": true }`. ACK gagal mengikuti format lobby. Kode game meliputi `HOST_ONLY`, `PLAYERS_NOT_READY`, `INVALID_CATEGORY`, `INVALID_CUSTOM_CATEGORY`, `CUSTOM_CATEGORY_UNAVAILABLE`, `ROUND_IN_PROGRESS`, `START_CANCELLED`, `INVALID_ROUND`, `NOT_A_PARTICIPANT`, `INVALID_PHASE`, `ACTION_EXPIRED`, `NOT_YOUR_TURN`, `ALREADY_SUBMITTED`, `INVALID_CLUE`, `INVALID_MESSAGE`, `ALREADY_VOTED`, `CANNOT_VOTE_SELF`, dan `INVALID_TARGET`.
 
 Fase berjalan otomatis: `WAITING` → `WORD_REVEAL` (10 detik) → `CLUE` (30 detik per pemain) → `DISCUSSION` (60 detik) → `VOTING` (45 detik) → `RESULT`. Clue yang melewati waktu dicatat dengan `text: null` dan `skipped: true`. Voting selesai lebih cepat jika seluruh peserta sudah memilih. Yang belum memilih saat waktu habis dianggap abstain. Impostor kalah hanya jika menjadi satu-satunya kandidat dengan suara terbanyak.
 
@@ -131,7 +131,7 @@ Sebelum `RESULT`, kata pemain lain, identitas impostor, dan pilihan suara tidak 
 
 ### AI dan siklus ronde
 
-Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Model utama `gemini-3.5-flash-lite` (7 detik) diikuti model cadangan `gemini-3.1-flash-lite` (5 detik) jika gagal, timeout, atau respons tidak valid. Gunakan `GEMINI_PRIMARY_MODEL` dan `GEMINI_FALLBACK_MODEL` untuk mengganti pilihan model. Jika keduanya gagal atau key belum ada, server memakai word bank. Kedua model Gemini yang berhasil tetap menghasilkan `source: "ai"`; client menunggu ACK `game:start` sampai 15 detik. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
+Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Model utama `gemini-3.5-flash-lite` (7 detik) diikuti model cadangan `gemini-3.1-flash-lite` (5 detik) jika gagal, timeout, atau respons tidak valid. Gunakan `GEMINI_PRIMARY_MODEL` dan `GEMINI_FALLBACK_MODEL` untuk mengganti pilihan model. Jika keduanya gagal atau key belum ada, kategori bawaan memakai word bank. Untuk kategori sendiri, server mengembalikan `CUSTOM_CATEGORY_UNAVAILABLE` dan room tetap di lobby agar host bisa mencoba lagi atau memilih kategori bawaan. Kedua model Gemini yang berhasil tetap menghasilkan `source: "ai"`; client menunggu ACK `game:start` sampai 15 detik. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
 
 Respons AI dengan pembungkus markdown atau teks pengantar dibaca dari objek JSON-nya, lalu tetap diperiksa tipe, panjang, dan pasangan katanya. Field tambahan dari respons AI tidak diteruskan ke game state.
 

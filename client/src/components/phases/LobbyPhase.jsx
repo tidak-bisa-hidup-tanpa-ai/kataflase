@@ -10,6 +10,9 @@ import AppHeader from '../AppHeader'
 import PlayerList from '../room/PlayerList'
 import RoomHeader from '../room/RoomHeader'
 
+const CUSTOM_CATEGORY = { id: 'custom', label: 'Kategori Sendiri' }
+const CUSTOM_CATEGORY_MAX = 50
+
 function startBlocker(room) {
   const players = room.players ?? []
   if (room.isStarting) return 'Menyiapkan kata rahasia…'
@@ -26,6 +29,7 @@ export default function LobbyPhase() {
   const leave = useLeaveRoom()
   const [options, setOptions] = useState([RANDOM_CATEGORY])
   const [category, setCategory] = useState(RANDOM_CATEGORY.id)
+  const [customCategory, setCustomCategory] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -49,12 +53,14 @@ export default function LobbyPhase() {
   }, [])
 
   const onlineCount = (room.players ?? []).filter((p) => p.online).length
-  const blocker = startBlocker(room)
+  const isCustom = category === CUSTOM_CATEGORY.id
+  const customName = customCategory.trim()
+  const blocker = startBlocker(room) ?? (isCustom && !customName ? 'Isi nama kategori untuk mulai' : null)
   const status = blocker ?? `${onlineCount} pemain online · siap mulai`
 
   async function onStart() {
     setBusy(true)
-    const res = await startGame(category)
+    const res = await startGame(category, isCustom ? customName : undefined)
     setBusy(false)
     if (!res.ok) toast(errorMessage(res), 'error')
   }
@@ -80,7 +86,7 @@ export default function LobbyPhase() {
         <section className="mt-6">
           <h2 className="label">Kategori</h2>
           <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Kategori kata">
-            {options.map((option) => {
+            {[...options, CUSTOM_CATEGORY].map((option) => {
               const active = category === option.id
               return (
                 <button
@@ -99,6 +105,20 @@ export default function LobbyPhase() {
               )
             })}
           </div>
+          {isCustom && (
+            <div className="mt-4">
+              <label htmlFor="custom-category" className="label">Nama Kategori</label>
+              <input
+                id="custom-category"
+                className="input mt-2"
+                value={customCategory}
+                maxLength={CUSTOM_CATEGORY_MAX}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                placeholder="Contoh: Futsal"
+                disabled={busy || room.isStarting}
+              />
+            </div>
+          )}
         </section>
       )}
 

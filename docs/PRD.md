@@ -18,7 +18,7 @@ Contoh ronde dengan empat pemain. Tiga pemain mendapat **Kopi** dan satu pemain 
 
 | Tahap                   | Yang dialami pemain                                                                                                                                                                                                              | Kapan lanjut                                                                                       |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Home dan lobby**      | Masukkan nickname, buat room, atau masuk dengan kode. Lobby menampilkan aturan singkat, daftar pemain online, dan tombol **Salin Kode Room**. Host memilih salah satu kategori awal atau **Acak**.                               | Hanya host yang bisa mulai ketika ada 3–6 anggota dan semuanya online.                             |
+| **Home dan lobby**      | Masukkan nickname, buat room, atau masuk dengan kode. Lobby menampilkan aturan singkat, daftar pemain online, dan tombol **Salin Kode Room**. Host memilih kategori bawaan, **Acak**, atau mengetik **Kategori Sendiri**.                               | Hanya host yang bisa mulai ketika ada 3–6 anggota dan semuanya online.                             |
 | **Kata rahasia**        | Server memilih satu impostor dan membagikan satu kata kepada tiap pemain. Di layar room, kata pribadi tersedia dalam kartu yang bisa dibuka kembali sepanjang ronde.                                                             | Setelah 10 detik, giliran pertama dimulai.                                                         |
 | **Petunjuk**            | Urutan diacak setiap ronde. Layar menunjukkan siapa yang sedang giliran. Setiap pemain boleh mengirim satu petunjuk singkat. Penyebutan literal kata sendiri ditolak. Petunjuk yang diterima langsung muncul untuk semua pemain. | Setelah semua giliran selesai. Pemain yang melewati batas 30 detik per giliran dilewati.           |
 | **Diskusi**             | Semua peserta membaca daftar petunjuk dan bisa berdiskusi melalui chat teks.                                                                                                                                                     | Setelah 60 detik.                                                                                  |
@@ -40,7 +40,7 @@ Layar lobby, kata, clue, diskusi, dan voting memakai tampilan room yang sama. Ko
 
 **AI Word Generator** meminta satu pasangan kata dalam bahasa Indonesia saat host menekan **Mulai**. Prompt memakai kategori yang dipilih dan satu tingkat kesulitan tetap. Pasangan yang baik cukup dekat untuk memunculkan petunjuk ambigu, tetapi maknanya berbeda. Contohnya **Kopi–Teh** atau **Lift–Eskalator**. Pasangan seperti **HP–Ponsel** terlalu mirip untuk ronde yang menarik.
 
-Server memeriksa respons terstruktur dan memakai word bank lokal jika permintaan gagal, terlalu lama, atau hasilnya tidak valid. Kualitas pasangan diuji saat playtest. Satu ronde dengan pasangan dari AI dan satu ronde dengan fallback harus bisa ditunjukkan saat pengujian.
+Server memeriksa respons terstruktur dan mencoba model cadangan jika model utama gagal. Jika kedua model gagal, kategori bawaan memakai word bank lokal. Untuk **Kategori Sendiri**, host tetap di lobby dan bisa mencoba lagi atau memilih kategori bawaan. Kualitas pasangan diuji saat playtest. Satu ronde dengan pasangan dari AI dan satu ronde dengan fallback harus bisa ditunjukkan saat pengujian.
 
 ## Batas MVP
 
@@ -86,7 +86,7 @@ Laporkan progres ke instructor minimal dua kali dan sertakan kontribusi anggota.
 - [ ] Vote bersamaan menghasilkan satu hasil. Seri, abstain, disconnect, host keluar, dan refresh ditangani sesuai aturan.
 - [ ] Refresh atau reconnect dengan sesi valid memulihkan fase, kata pribadi, dan status vote selama server masih berjalan. Setelah restart server, sesi lama ditolak dengan pesan yang jelas; host membuat room baru dan peserta dapat bergabung dengan kode baru.
 - [ ] Hasil tersedia sampai host menekan **Main Lagi**. Setelah itu, kode room, anggota, dan sesi tetap bisa dipakai, sementara kata, clue, chat, suara, dan hasil ronde lama dihapus.
-- [ ] AI menghasilkan pasangan valid. Respons gagal atau invalid memakai fallback. Replay tidak mengulang pasangan ronde sebelumnya.
+- [ ] AI menghasilkan pasangan valid. Jika kedua model gagal, kategori bawaan memakai word bank dan kategori sendiri tetap di lobby. Replay tidak mengulang pasangan ronde sebelumnya.
 - [ ] Client dan server berfungsi di URL publik. Tautan room yang dibuka langsung dan halaman yang di-refresh bisa dipulihkan sesuai sesi.
 - [ ] Dokumentasi REST dan socket tersedia, kontribusi ketiga developer tercatat, dan dua laporan progres sudah disampaikan.
 

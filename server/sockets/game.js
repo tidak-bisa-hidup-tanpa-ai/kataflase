@@ -101,7 +101,12 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
   async function start(socket, payload, acknowledge) {
     if (typeof acknowledge !== "function") return;
     const requestedCategory = payload?.category ?? "acak";
-    if (!isValidCategory(requestedCategory)) {
+    const isCustom = requestedCategory === "custom";
+    const customCategory = typeof payload?.customCategory === "string" ? payload.customCategory.trim() : "";
+    if (isCustom && (!customCategory || customCategory.length > 50 || /[\p{C}\p{Zl}\p{Zp}]/u.test(customCategory))) {
+      return acknowledge(failure("INVALID_CUSTOM_CATEGORY", "Isi nama kategori sendiri, maksimal 50 karakter dalam satu baris."));
+    }
+    if (!isCustom && !isValidCategory(requestedCategory)) {
       return acknowledge(failure("INVALID_CATEGORY", "Kategori tidak tersedia."));
     }
     let attempt;
@@ -117,7 +122,7 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
           return failure("PLAYERS_NOT_READY", "Ronde memerlukan 3–6 pemain dan semuanya harus online.");
         }
         const categories = getAvailableCategories().filter((category) => category !== "acak");
-        const category = requestedCategory === "acak"
+        const category = isCustom ? customCategory : requestedCategory === "acak"
           ? categories[Math.floor(Math.random() * categories.length)] : requestedCategory;
         room.isStarting = true;
         room.revision += 1;
@@ -128,7 +133,7 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
       });
       if (attempt.error) return acknowledge(attempt);
       publish(attempt.room);
-      const pair = await generateWordPair(attempt.category, attempt.room.lastWordPairHash);
+      const pair = await generateWordPair(attempt.category, attempt.room.lastWordPairHash, { allowWordBank: !isCustom });
       const result = withPlayer(socket, (room, playerId) => {
         if (room !== attempt.room || room.phase !== "WAITING" || !room.isStarting
           || room.revision !== attempt.revision || room.hostId !== playerId) {
@@ -139,6 +144,9 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
           room.isStarting = false;
           room.revision += 1;
           return failure("START_CANCELLED", "Ada pemain yang terputus. Silakan mulai lagi.");
+        }
+        if (!pair) {
+          return failure("CUSTOM_CATEGORY_UNAVAILABLE", "AI belum bisa membuat kata untuk kategori ini. Coba lagi atau pilih kategori bawaan.");
         }
         const setup = setupRound(attempt.players, pair);
         room.round = {
@@ -155,7 +163,7 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
         return { ok: true, data: { roundId: room.round.id } };
       });
       if (result.error) cancelStart(attempt);
-      publish(attempt.room);
+      else publish(attempt.room);
       acknowledge(result);
     } catch (error) {
       if (attempt?.room) cancelStart(attempt);
