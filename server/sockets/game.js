@@ -1,5 +1,4 @@
 const { randomUUID } = require("node:crypto");
-const { Room, RoomPlayer, Round, sequelize } = require("../models");
 const { generateWordPair } = require("../helpers/gemini");
 const { getAvailableCategories, isValidCategory, getWordPairHash } = require("../helpers/wordBank");
 const { setupRound } = require("../helpers/shuffler");
@@ -14,10 +13,8 @@ function failure(code, message) {
 
 function finishRound(room, round) {
   round.result = calculateRoundResult({
-    votes: round.votes,
-    players: round.players,
-    impostorId: round.impostorId,
-    playerWords: round.playerWords,
+    votes: round.votes, players: round.players,
+    impostorId: round.impostorId, playerWords: round.playerWords,
   });
   room.phase = "RESULT";
   round.deadlineAt = null;
@@ -29,7 +26,7 @@ function nextClue(room, round, now) {
   round.deadlineAt = new Date(now + DURATION[room.phase]);
 }
 
-async function advanceExpired(room, round, transaction) {
+function advanceExpired(room, round) {
   let changed = false;
   while (round?.deadlineAt && round.deadlineAt.getTime() <= Date.now()) {
     const expiredAt = round.deadlineAt.getTime();
@@ -51,64 +48,54 @@ async function advanceExpired(room, round, transaction) {
     }
     changed = true;
   }
-  if (changed) {
-    room.revision += 1;
-    await room.save({ transaction });
-    await round.save({ transaction });
-  }
-  return changed;
+  if (changed) room.revision += 1;
 }
 
-module.exports = (io, { emitRoomState, getOnlinePlayerIds, scheduleExpiry }) => {
+module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry }) => {
   const timers = new Map();
 
-  function schedule(state) {
-    if (!state) return;
-    const { room, round } = state;
-    const previous = timers.get(room.code);
-    if (previous && previous.revision > room.revision) return;
-    clearTimeout(previous?.timer);
-    const entry = { revision: room.revision };
-    timers.set(room.code, entry);
+  function publish(room) {
+    const state = emitRoomState(io, room);
+    clearTimeout(timers.get(room.code));
+    timers.delete(room.code);
+    const { round } = state;
     if (!round?.deadlineAt || room.phase === "RESULT") return;
+
+    const roundId = round.id;
     const deadline = round.deadlineAt.getTime();
-    entry.timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
+      if (timers.get(room.code) !== timer) return;
+      timers.delete(room.code);
+      const current = rooms.get(room.code);
+      if (current?.round?.id !== roundId || current.round.deadlineAt?.getTime() !== deadline) return;
       try {
-        const changed = await sequelize.transaction(async (transaction) => {
-          const currentRoom = await Room.findByPk(room.id, { lock: transaction.LOCK.UPDATE, transaction });
-          const currentRound = await Round.findOne({ where: { roomId: room.id }, transaction });
-          if (!currentRoom || currentRound?.id !== round.id
-            || currentRound.deadlineAt?.getTime() !== deadline) return false;
-          await advanceExpired(currentRoom, currentRound, transaction);
-          return true;
-        });
-        if (changed) await publish(room);
+        advanceExpired(current, current.round);
+        publish(current);
       } catch (error) {
         console.error("Game timer failed:", error.name);
-        entry.timer = setTimeout(() => publish(room).catch((err) => {
-          console.error("Game timer recovery failed:", err.name);
-        }), 1000).unref();
       }
     }, Math.max(0, deadline - Date.now())).unref();
+    timers.set(room.code, timer);
   }
 
-  async function publish(room) {
-    schedule(await emitRoomState(io, room));
-  }
-
-  async function withPlayer(socket, callback) {
+  function withPlayer(socket, callback) {
     const { roomCode, playerId } = socket.data;
     if (!playerId) return failure("NOT_IN_ROOM", "Masuk ke room terlebih dahulu.");
-    return sequelize.transaction(async (transaction) => {
-      const room = await Room.findOne({ where: { code: roomCode }, lock: transaction.LOCK.UPDATE, transaction });
-      if (!room || !socket.connected || socket.data.playerId !== playerId
-        || socket.data.roomCode !== roomCode || socket.data.leavingRoom) {
-        return failure("SESSION_EXPIRED", "Sesi room sudah tidak aktif.");
-      }
-      const player = await RoomPlayer.findOne({ where: { id: playerId, roomId: room.id }, transaction });
-      if (!player) return failure("SESSION_EXPIRED", "Sesi room sudah tidak aktif.");
-      return callback(room, playerId, transaction);
-    });
+    const room = rooms.get(roomCode);
+    if (!room || !socket.connected || !room.players.some((member) => member.id === playerId)) {
+      return failure("SESSION_EXPIRED", "Sesi room sudah tidak aktif.");
+    }
+    return callback(room, playerId);
+  }
+
+  function cancelStart(attempt) {
+    const room = rooms.get(attempt.room.code);
+    if (room === attempt.room && room.phase === "WAITING"
+      && room.isStarting && room.revision === attempt.revision) {
+      room.isStarting = false;
+      room.revision += 1;
+    }
+    if (room) publish(room);
   }
 
   async function start(socket, payload, acknowledge) {
@@ -119,100 +106,94 @@ module.exports = (io, { emitRoomState, getOnlinePlayerIds, scheduleExpiry }) => 
     }
     let attempt;
     try {
-      attempt = await withPlayer(socket, async (room, playerId, transaction) => {
+      attempt = withPlayer(socket, (room, playerId) => {
         if (room.hostId !== playerId) return failure("HOST_ONLY", "Hanya host yang bisa memulai ronde.");
         if (room.phase !== "WAITING" || room.isStarting) {
           return failure("ROUND_IN_PROGRESS", "Ronde sudah berjalan atau sedang disiapkan.");
         }
-        const members = await RoomPlayer.findAll({ where: { roomId: room.id }, order: [["id", "ASC"]], transaction });
         const onlineIds = getOnlinePlayerIds(io, `room:${room.code}`);
-        if (members.length < 3 || members.length > 6 || members.some((member) => !onlineIds.has(member.id))) {
+        if (room.players.length < 3 || room.players.length > 6
+          || room.players.some((member) => !onlineIds.has(member.id))) {
           return failure("PLAYERS_NOT_READY", "Ronde memerlukan 3–6 pemain dan semuanya harus online.");
         }
         const categories = getAvailableCategories().filter((category) => category !== "acak");
         const category = requestedCategory === "acak"
           ? categories[Math.floor(Math.random() * categories.length)] : requestedCategory;
-        await room.update({ isStarting: true, revision: room.revision + 1 }, { transaction });
+        room.isStarting = true;
+        room.revision += 1;
         return {
           room, category, revision: room.revision,
-          players: members.map((member) => ({ playerId: member.id, nickname: member.nickname })),
+          players: room.players.map((member) => ({ playerId: member.id, nickname: member.nickname })),
         };
       });
       if (attempt.error) return acknowledge(attempt);
-      await publish(attempt.room);
+      publish(attempt.room);
       const pair = await generateWordPair(attempt.category, attempt.room.lastWordPairHash);
-      const result = await withPlayer(socket, async (room, playerId, transaction) => {
-        if (room.id !== attempt.room.id || room.phase !== "WAITING" || !room.isStarting
+      const result = withPlayer(socket, (room, playerId) => {
+        if (room !== attempt.room || room.phase !== "WAITING" || !room.isStarting
           || room.revision !== attempt.revision || room.hostId !== playerId) {
           return failure("START_CANCELLED", "Susunan pemain berubah. Silakan mulai lagi.");
         }
         const onlineIds = getOnlinePlayerIds(io, `room:${room.code}`);
-        if (attempt.players.some((player) => !onlineIds.has(player.playerId))) {
-          await room.update({ isStarting: false, revision: room.revision + 1 }, { transaction });
+        if (attempt.players.some((member) => !onlineIds.has(member.playerId))) {
+          room.isStarting = false;
+          room.revision += 1;
           return failure("START_CANCELLED", "Ada pemain yang terputus. Silakan mulai lagi.");
         }
         const setup = setupRound(attempt.players, pair);
-        const round = await Round.create({
-          id: randomUUID(), roomId: room.id, category: attempt.category, source: pair.source,
-          players: attempt.players, turnOrder: setup.turnOrder, playerWords: setup.playerWords,
-          impostorId: setup.impostorId, deadlineAt: new Date(Date.now() + DURATION.WORD_REVEAL),
-        }, { transaction });
-        await room.update({
-          phase: "WORD_REVEAL", isStarting: false,
-          lastWordPairHash: getWordPairHash(pair), revision: room.revision + 1,
-        }, { transaction });
-        return { ok: true, data: { roundId: round.id } };
+        room.round = {
+          id: randomUUID(), category: attempt.category, source: pair.source,
+          players: attempt.players, turnOrder: setup.turnOrder, turnIndex: 0,
+          playerWords: setup.playerWords, impostorId: setup.impostorId,
+          clues: [], chat: [], votes: {}, result: null,
+          deadlineAt: new Date(Date.now() + DURATION.WORD_REVEAL),
+        };
+        room.phase = "WORD_REVEAL";
+        room.isStarting = false;
+        room.lastWordPairHash = getWordPairHash(pair);
+        room.revision += 1;
+        return { ok: true, data: { roundId: room.round.id } };
       });
-      if (result.error) await cancelStart(attempt);
-      await publish(attempt.room);
+      if (result.error) cancelStart(attempt);
+      publish(attempt.room);
       acknowledge(result);
     } catch (error) {
-      if (attempt?.room) await cancelStart(attempt).catch(() => {});
+      if (attempt?.room) cancelStart(attempt);
       acknowledge(failure("INTERNAL_SERVER_ERROR", "Gagal menyiapkan ronde."));
       console.error("Game start failed:", error.name);
     }
   }
 
-  async function cancelStart(attempt) {
-    await sequelize.transaction(async (transaction) => {
-      const room = await Room.findByPk(attempt.room.id, { lock: transaction.LOCK.UPDATE, transaction });
-      if (room?.phase === "WAITING" && room.isStarting && room.revision === attempt.revision) {
-        await room.update({ isStarting: false, revision: room.revision + 1 }, { transaction });
-      }
-    });
-    await publish(attempt.room);
-  }
-
-  async function act(socket, payload, acknowledge, action) {
+  function act(socket, payload, acknowledge, action) {
     if (typeof acknowledge !== "function") return;
     let affectedRoom;
     try {
-      const result = await withPlayer(socket, async (room, playerId, transaction) => {
+      const result = withPlayer(socket, (room, playerId) => {
         affectedRoom = room;
-        const round = await Round.findOne({ where: { roomId: room.id }, transaction });
+        const round = room.round;
         if (!round || payload?.roundId !== round.id) {
           return failure("INVALID_ROUND", "Ronde sudah berubah atau tidak tersedia.");
         }
-        if (!round.players.some((player) => player.playerId === playerId)) {
+        if (!round.players.some((member) => member.playerId === playerId)) {
           return failure("NOT_A_PARTICIPANT", "Pemain bukan peserta ronde ini.");
         }
         const phaseBefore = room.phase;
         const turnBefore = round.turnIndex;
-        await advanceExpired(room, round, transaction);
+        advanceExpired(room, round);
         if (phaseBefore !== room.phase || turnBefore !== round.turnIndex) {
           return failure("ACTION_EXPIRED", "Batas waktu aksi sudah berakhir.");
         }
         if (action === "restart") {
           if (room.hostId !== playerId) return failure("HOST_ONLY", "Hanya host yang bisa kembali ke lobby.");
           if (room.phase !== "RESULT") return failure("INVALID_PHASE", "Ronde belum selesai.");
-          await round.destroy({ transaction });
-          await room.update({ phase: "WAITING", isStarting: false, revision: room.revision + 1 }, { transaction });
+          room.round = null;
+          room.phase = "WAITING";
+          room.isStarting = false;
+          room.revision += 1;
           const onlineIds = getOnlinePlayerIds(io, `room:${room.code}`);
-          const members = await RoomPlayer.findAll({ where: { roomId: room.id }, transaction });
-          for (const member of members) {
-            await member.update({
-              disconnectExpiresAt: onlineIds.has(member.id) ? null : new Date(Date.now() + 30000),
-            }, { transaction });
+          for (const member of room.players) {
+            member.disconnectExpiresAt = onlineIds.has(member.id) ? null : new Date(Date.now() + 30000);
+            if (member.disconnectExpiresAt) scheduleExpiry(room.code, member.id, member.disconnectExpiresAt);
           }
           return { ok: true };
         }
@@ -237,27 +218,17 @@ module.exports = (io, { emitRoomState, getOnlinePlayerIds, scheduleExpiry }) => 
           }].slice(-50);
         } else if (action === "vote") {
           const validation = validateVote({
-            voterId: playerId, targetPlayerId: payload.targetPlayerId, activePlayers: round.players,
-            votes: round.votes,
+            voterId: playerId, targetPlayerId: payload.targetPlayerId,
+            activePlayers: round.players, votes: round.votes,
           });
           if (!validation.valid) return failure(validation.code, validation.reason);
           round.votes = { ...round.votes, [playerId]: payload.targetPlayerId };
           if (Object.keys(round.votes).length === round.players.length) finishRound(room, round);
         }
         room.revision += 1;
-        await room.save({ transaction });
-        await round.save({ transaction });
         return { ok: true };
       });
-      if (affectedRoom) {
-        await publish(affectedRoom);
-        if (action === "restart" && result.ok) {
-          const offlineMembers = await RoomPlayer.findAll({ where: { roomId: affectedRoom.id } });
-          for (const member of offlineMembers) {
-            if (member.disconnectExpiresAt) scheduleExpiry(io, affectedRoom.code, member.id, member.disconnectExpiresAt);
-          }
-        }
-      }
+      if (affectedRoom) publish(affectedRoom);
       acknowledge(result);
     } catch (error) {
       acknowledge(failure("INTERNAL_SERVER_ERROR", "Gagal memproses aksi permainan."));
@@ -272,20 +243,6 @@ module.exports = (io, { emitRoomState, getOnlinePlayerIds, scheduleExpiry }) => 
         "clue:submit": "clue", "chat:send": "chat", "vote:submit": "vote", "game:restart": "restart",
       })) {
         socket.on(event, (payload, acknowledge) => act(socket, payload, acknowledge, action));
-      }
-    },
-    async restore() {
-      const rooms = await Room.findAll();
-      for (const room of rooms) {
-        await sequelize.transaction(async (transaction) => {
-          const currentRoom = await Room.findByPk(room.id, { lock: transaction.LOCK.UPDATE, transaction });
-          if (currentRoom.isStarting) {
-            await currentRoom.update({ isStarting: false, revision: currentRoom.revision + 1 }, { transaction });
-          }
-          const round = await Round.findOne({ where: { roomId: room.id }, transaction });
-          await advanceExpired(currentRoom, round, transaction);
-        });
-        await publish(room);
       }
     },
   };

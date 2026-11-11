@@ -6,7 +6,7 @@ Game multiplayer realtime untuk 3–6 pemain. Semua pemain memberi petunjuk dan 
 
 - [PRD](docs/PRD.md) memuat aturan permainan, cakupan MVP, dan pembagian kerja.
 - [ADR](docs/ADR.md) memuat keputusan arsitektur dan kontrak integrasi client–server.
-- [API server](server/API.md) memuat setup PostgreSQL, endpoint REST, event Socket.IO, dan payload untuk client.
+- [API server](server/API.md) memuat setup server, endpoint REST, event Socket.IO, dan payload untuk client.
 
 ## Struktur project
 
@@ -17,11 +17,9 @@ kataflase/
 │   ├── PRD.md
 │   └── ADR.md
 ├── server/
+│   ├── __test__/
 │   ├── bin/www.js
-│   ├── config/config.json
 │   ├── helpers/
-│   ├── migrations/
-│   ├── models/
 │   ├── routers/index.js
 │   ├── sockets/
 │   ├── .env.example
@@ -33,7 +31,7 @@ kataflase/
 └── README.md
 ```
 
-`app.js` menyiapkan Express, `bin/www.js` menjalankan HTTP dan Socket.IO, `routers/` menangani endpoint REST, dan `sockets/` menangani aksi realtime. `helpers/` berisi generator kata, word bank, serta fungsi pengacakan, validasi, dan perhitungan hasil. Model dan migration mengikuti struktur Sequelize CLI.
+`app.js` menyiapkan Express, `bin/www.js` menjalankan HTTP dan Socket.IO, `routers/` menangani endpoint REST, dan `sockets/` menangani aksi realtime. `helpers/` berisi generator kata, word bank, serta fungsi pengacakan, validasi, dan perhitungan hasil. Room, sesi, dan ronde disimpan di memory satu proses server tanpa database.
 
 ## Menjalankan server
 
@@ -43,16 +41,17 @@ npm ci
 cp -n .env.example .env
 ```
 
-Sesuaikan koneksi PostgreSQL pada `config/config.json`. Jika database development belum dibuat, jalankan `npx sequelize-cli db:create`. Isi `GEMINI_API_KEY` di `.env`; jika key belum tersedia, permainan memakai word bank.
+Isi `GEMINI_API_KEY` di `.env`; jika key belum tersedia, permainan memakai word bank.
 
 ```sh
-npx sequelize-cli db:migrate
 npm start
 ```
 
 Server berjalan di `http://localhost:3000`. Dokumentasi payload untuk pengembangan client tersedia di [API server](server/API.md).
 
-Jalankan `npm test` dari folder server untuk menguji validasi clue, vote, dan parsing respons AI. Pengujian ini tidak memakai database atau memanggil API Gemini.
+Jalankan `npm test` dari folder server untuk menguji keamanan dan alur Socket.IO. Tes tidak memanggil API Gemini. Tes integrasi memakai timer game sebenarnya, sehingga membutuhkan sekitar satu menit.
+
+Deploy server sebagai satu instance. Refresh browser atau reconnect dapat memulihkan sesi selama server masih berjalan. Restart, crash, atau redeploy server menghapus seluruh room dan ronde. Kode lama tidak berlaku; host membuat room baru dan pemain lain bergabung memakai kode baru. Main Lagi setelah ronde normal tetap memakai kode room yang sama.
 
 ## Mulai kontribusi
 

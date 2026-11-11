@@ -2,7 +2,7 @@
 
 |              |                                                      |
 | ------------ | ---------------------------------------------------- |
-| **Versi**    | 0.2                                                  |
+| **Versi**    | 0.3                                                  |
 | **Status**   | Baseline MVP untuk ditinjau tim                      |
 | **Proyek**   | Hacktiv8 Full Stack JavaScript Phase 2 Group Project |
 | **Tim**      | 3 developer                                          |
@@ -34,7 +34,7 @@ Layar lobby, kata, clue, diskusi, dan voting memakai tampilan room yang sama. Ko
 - Di lobby, slot pemain dipertahankan selama 30 detik. Selama ronde aktif, identitas pemain dipertahankan sampai hasil dan batas waktu ronde tetap berjalan. Pemain yang tersambung kembali dengan sesi valid menerima fase, kata, dan status voting yang sama.
 - Peserta yang offline tetap bisa menjadi kandidat voting. Anggota baru masuk ketika room berada di lobby.
 - Jika host keluar atau putus koneksi, pemain online yang paling awal bergabung mengambil alih. Host sebelumnya kembali sebagai anggota biasa jika sesi masih valid.
-- PostgreSQL menyimpan room, sesi, dan ronde aktif agar pemain bisa kembali dengan kode serta sesi yang sama setelah server restart. Batas waktu fase tetap dihitung dari deadline yang tersimpan. Jika sesi sudah kedaluwarsa, tampilkan pesan dan beri jalan kembali ke Home.
+- Room, sesi, dan ronde aktif disimpan sementara di memory satu proses server tanpa database. Refresh atau reconnect bisa memulihkan sesi selama server masih berjalan. Restart, crash, atau redeploy menghapus room dan ronde; client kembali ke Home, host membuat room baru, lalu pemain lain memasukkan kode baru.
 
 ## AI pendukung
 
@@ -46,7 +46,7 @@ Server memeriksa respons terstruktur dan memakai word bank lokal jika permintaan
 
 | Prioritas                       | Cakupan                                                                                                                                                                                           |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **P0**                          | Room privat lewat kode, sesi nickname, satu ronde lengkap, clue bergiliran, chat, vote, hasil, main lagi dengan kode yang sama, pemulihan room dan sesi setelah restart, AI dan fallback, tampilan mobile, serta client dan server publik. |
+| **P0**                          | Room privat lewat kode, sesi nickname, satu ronde lengkap, clue bergiliran, chat, vote, hasil, main lagi dengan kode yang sama, reconnect selama server masih berjalan, penanganan sesi yang hilang setelah restart, AI dan fallback, tampilan mobile, serta client dan server publik. |
 | **P1 setelah alur inti stabil** | Variasi difficulty, voting ulang, scoreboard lintas ronde, timer yang bisa diatur host, animasi tambahan, dan AI recap.                                                                           |
 | **Di luar cakupan versi ini**   | Akun permanen, leaderboard persisten, matchmaking publik, friend list, voice/video, dan role tambahan.                                                                                            |
 
@@ -68,13 +68,13 @@ Laporkan progres ke instructor minimal dua kali dan sertakan kontribusi anggota.
 | Owner                              | Deliverable                                                                                                                               |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | **Developer 1 · Client**           | Home, room, hasil, Router, Context, komponen gameplay, tampilan mobile, dan deployment client. Mulai dari contoh data yang disepakati.    |
-| **Developer 2 · Room dan koneksi** | Express/Socket.IO, penyimpanan room dan sesi di PostgreSQL lewat Sequelize, reconnect, host transfer, pengiriman data publik dan privat, REST, dokumentasi API, dan deployment server. |
+| **Developer 2 · Room dan koneksi** | Express/Socket.IO, room dan sesi di memory server, reconnect, host transfer, pengiriman data publik dan privat, REST, dokumentasi API, dan deployment satu instance server. |
 | **Developer 3 · Aturan dan AI**    | Pembagian kata, fase dan timer, validasi clue/vote, hasil, replay, word bank, dan integrasi AI.                                           |
 
 | Target                           | Bukti selesai                                                                                                                                                          |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **10 November · Lobby realtime** | Sepakati format data lebih dulu. Tiga browser masuk ke room yang sama dan daftar pemain ikut berubah. Gunakan hasil ini untuk laporan pertama.                         |
-| **11 November · Ronde lengkap**  | Integrasikan satu ronde dengan word bank terlebih dahulu, lalu AI. Uji reconnect, pemulihan setelah restart server, timeout, seri, dan replay. Jalankan dari URL publik dan gunakan untuk laporan kedua. |
+| **11 November · Ronde lengkap**  | Integrasikan satu ronde dengan word bank terlebih dahulu, lalu AI. Uji reconnect, penanganan sesi yang hilang setelah restart, timeout, seri, dan replay. Jalankan dari URL publik dan gunakan untuk laporan kedua. |
 | **12 November · Siap demo**      | Perbaiki masalah yang menghalangi ronde. Targetkan demo siap pukul 10.30 WIB sebelum deadline pukul 12.00 WIB.                                                         |
 
 ## Kriteria penerimaan
@@ -84,7 +84,7 @@ Laporkan progres ke instructor minimal dua kali dan sertakan kontribusi anggota.
 - [ ] Sebelum hasil, setiap browser hanya menerima kata pemainnya sendiri. Data publik tidak membocorkan identitas impostor atau pilihan vote.
 - [ ] Giliran dan timer berfungsi. Server menolak clue di luar giliran, penyebutan literal kata sendiri, vote diri sendiri, vote ulang, dan aksi di fase yang salah.
 - [ ] Vote bersamaan menghasilkan satu hasil. Seri, abstain, disconnect, host keluar, dan refresh ditangani sesuai aturan.
-- [ ] Setelah restart server, pemain dengan sesi valid bisa kembali ke room dengan kode yang sama. Fase, deadline, petunjuk, dan suara yang sudah disimpan dipulihkan.
+- [ ] Refresh atau reconnect dengan sesi valid memulihkan fase, kata pribadi, dan status vote selama server masih berjalan. Setelah restart server, sesi lama ditolak dengan pesan yang jelas; host membuat room baru dan peserta dapat bergabung dengan kode baru.
 - [ ] Hasil tersedia sampai host menekan **Main Lagi**. Setelah itu, kode room, anggota, dan sesi tetap bisa dipakai, sementara kata, clue, chat, suara, dan hasil ronde lama dihapus.
 - [ ] AI menghasilkan pasangan valid. Respons gagal atau invalid memakai fallback. Replay tidak mengulang pasangan ronde sebelumnya.
 - [ ] Client dan server berfungsi di URL publik. Tautan room yang dibuka langsung dan halaman yang di-refresh bisa dipulihkan sesuai sesi.
