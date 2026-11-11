@@ -25,7 +25,8 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
     let output = "";
     server = spawn(process.execPath, ["bin/www.js"], {
       cwd: path.join(__dirname, ".."), windowsHide: true,
-      env: { ...process.env, NODE_ENV: "test", PORT: "0", GEMINI_API_KEY: "" },
+      // Lewati .env lokal agar tes fallback tidak memakai key Gemini pengguna.
+      env: { ...process.env, NODE_ENV: "production", PORT: "0", GEMINI_API_KEY: "" },
       stdio: ["ignore", "pipe", "pipe"],
     });
     server.stdout.on("data", (chunk) => { output += chunk; });

@@ -63,9 +63,9 @@ Simpan token di `sessionStorage` per tab. Saat reconnect atau refresh selama ser
 ## Integrasi AI
 
 1. Validasi kategori dari pilihan yang didukung. Jika host memilih acak, server memilih kategori sebelum memanggil provider.
-2. Minta pasangan kata dalam bahasa Indonesia dengan keluaran terstruktur `wordA` dan `wordB`. Tetapkan timeout awal lima detik.
+2. Minta pasangan kata dalam bahasa Indonesia dengan keluaran terstruktur `wordA` dan `wordB`. Model utama mendapat waktu tujuh detik dan model cadangan lima detik. Client menunggu ACK `game:start` hingga 15 detik.
 3. Periksa dua nilai teks yang pendek dan tidak kosong. Tolak kata yang identik setelah normalisasi. Bandingkan hash dari pasangan yang dinormalisasi dan diurutkan dengan hash ronde terakhir, sehingga urutan terbalik juga terdeteksi.
-4. Gunakan word bank jika provider gagal, timeout, atau respons tidak lolos. Pilih pasangan berbeda dari ronde terakhir, lalu acak satu impostor dan bagikan kata.
+4. Coba model cadangan jika model utama gagal, timeout, atau respons tidak lolos. Gunakan word bank jika kedua model gagal atau key tidak tersedia. Pilih pasangan berbeda dari ronde terakhir, lalu acak satu impostor dan bagikan kata.
 
 Validasi struktur dilakukan otomatis. Kelayakan makna dan kualitas petunjuk dinilai lewat playtest. Uji jalur AI sukses dan fallback sebelum demo publik.
 

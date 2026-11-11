@@ -7,6 +7,7 @@ import { socket } from '../socket'
 import { GameContext } from './GameContext'
 
 const ACK_TIMEOUT_MS = 8000
+const START_ACK_TIMEOUT_MS = 15000
 const CONNECT_TIMEOUT_MS = 6000
 const ROOM_FALLBACK_MS = 2000
 
@@ -23,7 +24,8 @@ async function emitConnected(event, payload) {
   if (!socket.connected) return { ok: false, code: 'NETWORK' }
   try {
     const args = payload === undefined ? [] : [payload]
-    const res = await socket.timeout(ACK_TIMEOUT_MS).emitWithAck(event, ...args)
+    const timeout = event === 'game:start' ? START_ACK_TIMEOUT_MS : ACK_TIMEOUT_MS
+    const res = await socket.timeout(timeout).emitWithAck(event, ...args)
     return normalizeAck(res)
   } catch {
     return { ok: false, code: 'TIMEOUT' }

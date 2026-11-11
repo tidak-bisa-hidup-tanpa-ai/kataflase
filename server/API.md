@@ -131,7 +131,7 @@ Sebelum `RESULT`, kata pemain lain, identitas impostor, dan pilihan suara tidak 
 
 ### AI dan siklus ronde
 
-Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Kegagalan API, timeout lima detik, atau respons invalid memakai word bank. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
+Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Model utama `gemini-3.5-flash-lite` (7 detik) diikuti model cadangan `gemini-3.1-flash-lite` (5 detik) jika gagal, timeout, atau respons tidak valid. Gunakan `GEMINI_PRIMARY_MODEL` dan `GEMINI_FALLBACK_MODEL` untuk mengganti pilihan model. Jika keduanya gagal atau key belum ada, server memakai word bank. Kedua model Gemini yang berhasil tetap menghasilkan `source: "ai"`; client menunggu ACK `game:start` sampai 15 detik. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
 
 Respons AI dengan pembungkus markdown atau teks pengantar dibaca dari objek JSON-nya, lalu tetap diperiksa tipe, panjang, dan pasangan katanya. Field tambahan dari respons AI tidak diteruskan ke game state.
 
