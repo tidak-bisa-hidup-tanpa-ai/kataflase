@@ -2,7 +2,7 @@
 
 |             |                                 |
 | ----------- | ------------------------------- |
-| **Status**  | Baseline MVP untuk ditinjau tim |
+| **Status**  | Diterapkan pada MVP publik |
 | **Tanggal** | 11 November 2026                |
 | **Terkait** | [PRD Kataflase](PRD.md)         |
 
@@ -19,9 +19,9 @@ Mengikuti arahan instructor, MVP tidak menggunakan database. Tim menerima bahwa 
 | **Client**      | SPA Vite + React. Rute `/` untuk Home, `/rooms/:code` untuk lobby dan ronde, serta `/rooms/:code/result` untuk hasil. `ThemeContext` menangani preferensi tema lokal. Redux menyimpan snapshot publik room. `GameProvider` menangani sesi, koneksi, dan state pribadi; komponen tetap dapat memakai `useGame()`. Fase server menentukan tampilan aktif, termasuk saat halaman dibuka langsung. |
 | **Server**      | Satu proses Node.js menjalankan Express dan Socket.IO. Server memeriksa keanggotaan room, memvalidasi aksi, menyimpan state, menjalankan timer, membagikan kata, dan menetapkan hasil.                                                                                              |
 | **Penyimpanan** | Satu `Map` di memory proses Node.js menyimpan room, pemain, sesi, dan ronde aktif. Gunakan satu instance server. Restart, crash, atau redeploy menghapus seluruh state; kode dan sesi lama tidak berlaku. |
-| **HTTP**        | `GET /api/game-options` menyajikan kategori untuk pemilih di lobby. `GET /health` dipakai untuk memeriksa layanan. Dokumentasikan respons HTTP dan contoh payload socket.                                                                                                           |
-| **AI**          | Server memanggil satu provider yang sudah bisa diakses tim. API key berada di environment server. Word bank lokal memakai kategori yang sama dan menyediakan minimal dua pasangan valid per kategori.                                                                               |
-| **Deployment**  | Deploy client dan satu instance server publik. Siapkan fallback rute SPA, URL server di konfigurasi client, dan origin client yang diizinkan oleh server. Uji Socket.IO dari dua perangkat melalui URL publik.                                                                      |
+| **HTTP**        | `GET /api/game-options` menyajikan kategori untuk lobby dan `GET /health` memeriksa layanan. Respons dan payload ada di [kontrak API](../server/API.md). |
+| **AI**          | Server memakai Gemini untuk pasangan kata, saran privat, dan ulasan ronde. API key berada di environment server. Word bank menangani pasangan kata untuk kategori bawaan dan tersedia cadangan lokal untuk saran serta ulasan. |
+| **Deployment**  | Client Vite berjalan di [Vercel](https://kataflase.dipatipaw.web.id) dengan fallback rute SPA. Satu proses Node.js berjalan di [EC2](https://kataflase-server.dipatipaw.web.id/health). Express dan Socket.IO memakai origin frontend yang sama. |
 
 ## Game state
 
@@ -32,7 +32,7 @@ Mengikuti arahan instructor, MVP tidak menggunakan database. Tim menerima bahwa 
 - **Voting.** Daftar peserta dikunci saat ronde dimulai. Simpan suara dengan `playerId` sebagai kunci. Validasi, pencatatan suara, dan perubahan ke `RESULT` dilakukan secara sinkron dalam satu proses tanpa `await` di antaranya. Timer dan suara terakhir hanya bisa menutup satu hasil untuk ronde yang sama. Kirim pembaruan socket setelah state diperbarui.
 - **Replay.** Pertahankan hasil selama fase `RESULT`. Saat host mengirim `game:restart` untuk `roundId` yang aktif, kosongkan state ronde lama, batalkan timer-nya, dan kembalikan room ke `WAITING`. Kode room, anggota, dan sesi tetap berlaku. Simpan hash pasangan kata terakhir di room untuk mencegah pengulangan langsung. Ronde baru mendapat `roundId` baru.
 
-- **Room kosong.** Room dihapus ketika tidak ada anggota yang tersisa. Di luar lobby, room dihapus setelah semua anggota offline selama lima menit. **Main Lagi** mempertahankan room dan sesi yang masih berlaku.
+- **Room kosong.** Slot pemain offline di lobby bertahan 30 detik. Di luar lobby, room dihapus setelah semua anggota offline selama lima menit. Room dihapus segera ketika anggota terakhir keluar.
 
 ## Data dan batas akses
 
@@ -44,7 +44,7 @@ Mengikuti arahan instructor, MVP tidak menggunakan database. Tim menerima bahwa 
 | **Snapshot publik** | Daftar pemain, host, status start, fase, giliran, deadline, clue, chat, progres vote, dan hasil saat `RESULT`. Susun snapshot dari daftar field yang diizinkan. |
 | **State privat**    | `roundId`, kata sendiri, dan status apakah suara sendiri sudah diterima. Kirim hanya ke socket aktif pemain.                                                    |
 
-Identitas impostor, kata pemain lain, pasangan kata, dan pilihan vote per pemain disimpan di memory yang hanya diakses server selama ronde. Pada `RESULT`, publikasi cukup mencakup kata tiap pemain, identitas impostor, tally per kandidat, dan pemenang. Gunakan broadcast room untuk data publik dan pengiriman langsung untuk data privat. [Dokumentasi Socket.IO Rooms](https://socket.io/docs/v4/rooms/)
+Identitas impostor, kata pemain lain, pasangan kata, dan pilihan vote per pemain disimpan di memory yang hanya diakses server selama ronde. Pada `RESULT`, snapshot memuat kata tiap pemain, identitas impostor, jumlah suara per kandidat, alasan, pemenang, dan ulasan saat siap. Data publik dikirim ke room. Kata sendiri dan saran petunjuk dikirim langsung ke pemain terkait. [Dokumentasi Socket.IO Rooms](https://socket.io/docs/v4/rooms/)
 
 ## Kontrak integrasi Socket.IO
 
@@ -54,22 +54,25 @@ Identitas impostor, kata pemain lain, pasangan kata, dan pilihan vote per pemain
 | Client → server | `room:resume`, `room:leave`  | Resume memakai kode room dan token. Leave mencabut sesi dan memperbarui presence.                                              |
 | Client → server | `game:start`, `game:restart` | Start membawa kategori. Restart membawa `roundId`. Server memeriksa host dan fase.                                             |
 | Client → server | `clue:submit`, `chat:send`   | `roundId` dan teks. Clue memerlukan giliran yang benar dan satu pengiriman per pemain. Chat dibuka saat diskusi.               |
+| Client → server | `clue:hint` | `roundId`. Pemain yang sedang giliran menerima saran hanya melalui ACK privat. |
 | Client → server | `vote:submit`                | `roundId` dan `targetPlayerId`. Server memeriksa peserta, fase, deadline, target, dan suara sebelumnya.                        |
 | Server → room   | `room:state`                 | Snapshot publik terbaru dengan `revision`. Client mengganti snapshot ketika revisi lebih baru.                                 |
 | Server → pemain | `player:state`               | State privat untuk ronde terkait, termasuk ketika resume. Cocokkan `roundId` dengan ronde yang aktif sebelum menampilkan kata. |
 
 Gunakan ACK untuk mengonfirmasi penerimaan aksi atau memberi alasan penolakan seperti `NOT_YOUR_TURN`, `ALREADY_VOTED`, atau `SESSION_EXPIRED`. Server mengambil identitas dari sesi yang terikat ke socket aktif. Client menunggu konfirmasi sebelum menampilkan bahwa clue atau vote sudah diterima.
 
-Simpan token di `sessionStorage` per tab. Saat reconnect atau refresh selama server masih berjalan, validasi token dari sesi yang tersimpan, ikat sesi ke socket baru, gabungkan socket ke room, lalu kirim snapshot dan state privat. Socket lama yang digantikan kehilangan akses aksi. Sesudah server restart, `room:resume` mengembalikan `SESSION_EXPIRED`; client membersihkan sesi dan kembali ke Home. Host membuat room baru dan peserta memakai kode baru. Snapshot menggantikan event yang terlewat saat koneksi putus. [Socket.IO Delivery Guarantees](https://socket.io/docs/v4/delivery-guarantees/) · [Connection State Recovery](https://socket.io/docs/v4/connection-state-recovery/)
+Client menyimpan token di `sessionStorage` per tab. Saat reconnect atau refresh, server memvalidasi token melalui `room:resume`, mengikat sesi ke socket baru, lalu mengirim snapshot dan state privat. Socket lama yang digantikan kehilangan akses aksi. Sesudah server restart, `room:resume` mengembalikan `SESSION_EXPIRED`. Client menghapus sesi dan menampilkan tombol kembali ke Home. Snapshot memulihkan state yang terlewat selama koneksi putus. [Socket.IO Delivery Guarantees](https://socket.io/docs/v4/delivery-guarantees/)
 
 ## Integrasi AI
 
 1. Validasi kategori bawaan atau nama kategori sendiri sepanjang 1–50 karakter dalam satu baris. Jika host memilih acak, server memilih kategori bawaan sebelum memanggil provider.
 2. Minta pasangan kata dalam bahasa Indonesia dengan keluaran terstruktur `wordA` dan `wordB`. Model utama mendapat waktu tujuh detik dan model cadangan lima detik. Client menunggu ACK `game:start` hingga 15 detik.
-3. Periksa dua nilai teks yang pendek dan tidak kosong. Tolak kata yang identik setelah normalisasi. Bandingkan hash dari pasangan yang dinormalisasi dan diurutkan dengan hash ronde terakhir, sehingga urutan terbalik juga terdeteksi.
+3. Periksa dua nilai teks satu baris, maksimal 60 karakter, yang memiliki huruf atau angka. Tolak kata yang identik setelah normalisasi. Bandingkan hash pasangan dengan hash ronde terakhir, termasuk jika urutannya terbalik.
 4. Coba model cadangan jika model utama gagal, timeout, atau respons tidak lolos. Gunakan word bank untuk kategori bawaan jika kedua model gagal atau key tidak tersedia. Untuk kategori sendiri, pertahankan room di lobby agar host bisa mencoba lagi atau memilih kategori bawaan. Pilih pasangan berbeda dari ronde terakhir, lalu acak satu impostor dan bagikan kata.
 
-Validasi struktur dilakukan otomatis. Kelayakan makna dan kualitas petunjuk dinilai lewat playtest. Uji jalur AI sukses dan fallback sebelum demo publik.
+Saran hanya tersedia saat giliran sendiri. Server memvalidasi saran dengan aturan kata rahasia dan memakai satu hasil per giliran. Hasil voting dikirim sebelum pembuatan ulasan selesai. Jika host sudah memulai ulang permainan atau room dihapus, ulasan lama diabaikan.
+
+Batas 12 panggilan Gemini per menit berlaku bersama untuk ketiga fitur dan kedua model. Validasi struktur dilakukan otomatis. Kesesuaian makna dan kualitas petunjuk dinilai lewat playtest.
 
 ## Alternatif dan konsekuensi
 
@@ -79,6 +82,4 @@ Validasi struktur dilakukan otomatis. Kelayakan makna dan kualitas petunjuk dini
 | **Database persisten** | Dapat memulihkan room setelah restart, tetapi membutuhkan konfigurasi dan pengelolaan tambahan. Tidak digunakan pada MVP sesuai arahan instructor dan keputusan tim untuk menerima hilangnya room saat server berhenti. |
 | **Event publik terpisah untuk setiap perubahan** | Payload lebih kecil. Snapshot publik lebih sederhana untuk room kecil dan pemulihan koneksi, dengan biaya mengirim ulang beberapa field. Batasi riwayat chat agar payload tetap ringkas.                    |
 
-Pertahankan folder `client/` dan `server/`. Developer 1 memiliki tampilan dan Context. Developer 2 memiliki transport, sesi, dan penyusunan payload. Developer 3 memiliki aturan ronde dan AI. Sepakati contoh `room:state` dan `player:state` sebelum menyambungkan pekerjaan.
-
-**Masih terbuka.** Provider dan hosting spesifik mengikuti akses tim. Cakupan endpoint REST dikonfirmasi ke instructor. Durasi timer bisa disesuaikan setelah playtest dan dicatat di PRD.
+Folder `client/` dan `server/` dapat dijalankan terpisah. Perubahan payload perlu diselaraskan di server, client, dan [kontrak API](../server/API.md).

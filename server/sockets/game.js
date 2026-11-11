@@ -208,9 +208,11 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
   async function act(socket, payload, acknowledge, action) {
     if (typeof acknowledge !== "function") return;
     let affectedRoom;
+    let revisionBefore;
     try {
       const result = withPlayer(socket, (room, playerId) => {
         affectedRoom = room;
+        revisionBefore = room.revision;
         const round = room.round;
         if (!round || payload?.roundId !== round.id) {
           return failure("INVALID_ROUND", "Ronde sudah berubah atau tidak tersedia.");
@@ -281,7 +283,7 @@ module.exports = (io, { rooms, emitRoomState, getOnlinePlayerIds, scheduleExpiry
         room.revision += 1;
         return { ok: true };
       });
-      if (affectedRoom) publish(affectedRoom);
+      if (affectedRoom && affectedRoom.revision !== revisionBefore) publish(affectedRoom);
       acknowledge(await result);
     } catch (error) {
       acknowledge(failure("INTERNAL_SERVER_ERROR", "Gagal memproses aksi permainan."));
