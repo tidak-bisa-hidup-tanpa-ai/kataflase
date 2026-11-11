@@ -1,110 +1,77 @@
 # Kataflase
 
-Game multiplayer realtime untuk 3–6 pemain. Semua pemain memberi petunjuk dan berdiskusi untuk menebak siapa yang mendapat kata berbeda. AI membuat pasangan kata untuk ronde baru.
+Kataflase adalah game tebak impostor untuk **3–6 pemain**. Mayoritas pemain mendapat kata yang sama, sementara satu pemain mendapat kata berbeda. Beri petunjuk tanpa menyebut kata sendiri, diskusikan tebakan, lalu pilih siapa impostornya.
 
-## Dokumen proyek
+**[Main Kataflase](https://kataflase.dipatipaw.web.id)** · [Status API](https://kataflase-server.dipatipaw.web.id/health)
 
-- [PRD](docs/PRD.md) memuat aturan permainan, cakupan MVP, dan pembagian kerja.
-- [ADR](docs/ADR.md) memuat keputusan arsitektur dan kontrak integrasi client–server.
-- [API server](server/API.md) memuat setup server, endpoint REST, event Socket.IO, dan payload untuk client.
+## Cara main
 
-## Struktur project
+1. Masukkan nickname dan buat room. Bagikan kode atau tautan undangan. Host bisa mulai saat ada 3–6 pemain dan semuanya online.
+2. Pilih kategori bawaan, **Acak**, atau **Kategori Sendiri**. Setiap pemain hanya melihat kata miliknya, misalnya mayoritas mendapat **Kopi** dan satu pemain mendapat **Teh**.
+3. Beri satu petunjuk saat giliranmu. Tombol **Minta Saran** memberi ide privat yang bisa kamu pertimbangkan sebelum mengirim petunjuk sendiri.
+4. Diskusikan petunjuk di chat, lalu pilih satu pemain lain. Pemain biasa menang jika impostor menjadi satu-satunya orang dengan suara terbanyak. Seri atau salah tebak berarti impostor menang.
+5. Lihat identitas impostor, kata semua pemain, jumlah suara, dan ulasan ronde. Host bisa menekan **Main Lagi** untuk memulai ronde baru dengan kode yang sama.
 
-```text
-kataflase/
-├── client/
-│   ├── __test__/
-│   ├── public/
-│   └── src/
-│       ├── components/
-│       ├── constant/
-│       ├── contexts/
-│       ├── helpers/
-│       ├── pages/
-│       ├── socket/
-│       ├── App.jsx
-│       ├── index.css
-│       └── main.jsx
-├── docs/
-│   ├── PRD.md
-│   └── ADR.md
-├── server/
-│   ├── __test__/
-│   ├── bin/www.js
-│   ├── helpers/
-│   ├── routers/index.js
-│   ├── sockets/
-│   ├── .env.example
-│   ├── API.md
-│   ├── app.js
-│   ├── package.json
-│   └── package-lock.json
-├── .gitignore
-└── README.md
-```
+## Cara kerja
 
-`app.js` menyiapkan Express, `bin/www.js` menjalankan HTTP dan Socket.IO, `routers/` menangani endpoint REST, dan `sockets/` menangani aksi realtime. `helpers/` berisi generator kata, word bank, serta fungsi pengacakan, validasi, dan perhitungan hasil. Room, sesi, dan ronde disimpan di memory satu proses server tanpa database.
+Client memakai React, Vite, React Router, Tailwind CSS, React Context, dan Redux Toolkit. Express menyajikan REST untuk status dan kategori, sementara Socket.IO mengirim perubahan room secara realtime. Server menentukan fase, giliran, dan hasil. Browser menerima kata sendiri melalui pesan privat.
 
-## Menjalankan server
+Gemini membuat pasangan kata, memberi saran privat, dan menulis ulasan ronde. Kategori bawaan memakai word bank saat Gemini tidak tersedia. Saran dan ulasan memiliki cadangan lokal. Kategori sendiri memerlukan respons Gemini yang valid.
 
-```sh
+Room dan sesi berada di memory satu proses server. Refresh atau reconnect dapat memulihkan sesi yang masih berlaku. Restart server menghapus room dan ronde, sehingga pemain perlu membuat room baru.
+
+## Menjalankan secara lokal
+
+Gunakan Node.js 24 dan npm. Jalankan server dan client dari terminal terpisah.
+
+~~~bash
 cd server
 npm ci
 cp -n .env.example .env
-```
-
-Isi `GEMINI_API_KEY` di `.env`; jika key belum tersedia, permainan memakai word bank.
-
-```sh
 npm start
-```
+~~~
 
-Server berjalan di `http://localhost:3000`. Dokumentasi payload untuk pengembangan client tersedia di [API server](server/API.md).
+Server berjalan di `http://localhost:3000`. Isi `GEMINI_API_KEY` di `server/.env` untuk mengaktifkan Gemini.
 
-Jalankan `npm test` dari folder server untuk menguji keamanan dan alur Socket.IO. Tes tidak memanggil API Gemini. Tes integrasi memakai timer game sebenarnya, sehingga membutuhkan sekitar satu menit.
-
-Deploy server sebagai satu instance. Refresh browser atau reconnect dapat memulihkan sesi selama server masih berjalan. Restart, crash, atau redeploy server menghapus seluruh room dan ronde. Kode lama tidak berlaku; host membuat room baru dan pemain lain bergabung memakai kode baru. Main Lagi setelah ronde normal tetap memakai kode room yang sama.
-
-## Menjalankan client
-
-Biarkan server berjalan, lalu buka terminal lain:
-
-```sh
+~~~bash
 cd client
 npm ci
-cp -n .env.example .env
 npm run dev
-```
+~~~
 
-Client berjalan di `http://localhost:5173` dan memakai server `http://localhost:3000`. Atur `VITE_SERVER_URL` di environment client jika URL server berbeda, serta `CLIENT_ORIGIN` di server sesuai origin client. Setup, pemeriksaan, dan kontrak integrasi dijelaskan di [README client](client/README.md).
+Buka `http://localhost:5173`. Gunakan `VITE_SERVER_URL` jika client lokal perlu menunjuk ke alamat server lain.
+
+Dari root repo, jalankan pemeriksaan berikut. Tes server menggunakan timer ronde dan memerlukan sekitar satu menit.
+
+~~~bash
+npm --prefix server test
+npm --prefix client test
+npm --prefix client run lint
+npm --prefix client run build
+~~~
 
 ## Rilis EC2 dan Vercel
 
-1. Di Vercel, pilih Framework Preset **Vite**, Root Directory `client`, dan Production Branch `main`. Build produksi memakai `https://kataflase-server.dipatipaw.web.id` untuk REST dan Socket.IO. Jika `VITE_SERVER_URL` sudah diatur, pastikan nilainya memakai domain tersebut.
-2. Di EC2, gunakan `CLIENT_ORIGIN: "https://kataflase.dipatipaw.web.id"` pada bagian `env` di file konfigurasi PM2 yang sudah dipakai. Ini juga origin bawaan saat `NODE_ENV=production`. Nilai `CLIENT_ORIGIN` dari PM2 menggantikan bawaan.
-3. Setelah PR rilis masuk ke `main`, jalankan dari folder clone di EC2:
+| Layanan | Konfigurasi produksi |
+| --- | --- |
+| Client | [kataflase.dipatipaw.web.id](https://kataflase.dipatipaw.web.id). Vercel memakai preset **Vite**, Root Directory `client`, dan Production Branch `main`. |
+| Server | [kataflase-server.dipatipaw.web.id](https://kataflase-server.dipatipaw.web.id/health). Satu proses PM2 menjalankan `server/bin/www.js` di EC2. |
+| Koneksi | Build produksi client memakai domain server. Jika `VITE_SERVER_URL` diatur di Vercel, pakai `https://kataflase-server.dipatipaw.web.id`. Konfigurasi `env` PM2 memakai `NODE_ENV=production` dan `CLIENT_ORIGIN: "https://kataflase.dipatipaw.web.id"`. |
 
-   ```sh
-   git switch main
-   git pull --ff-only origin main
-   ```
+Setelah rilis masuk `main`, ambil versi terbaru di folder clone EC2.
 
-   Jalankan `npm ci` dari `server` jika dependency berubah. Dari folder konfigurasi PM2, jalankan `pm2 restart ecosystem.config.js --only kataflase --update-env`. Restart menghapus room aktif. Vercel yang terhubung ke GitHub membangun ulang client dari `main` secara otomatis.
-4. Cek `/health` pada domain server, lalu buka `https://kataflase.dipatipaw.web.id`. Buat satu room dengan tiga pemain dan uji undangan, kategori, **Minta Saran**, serta halaman hasil.
+~~~bash
+git switch main
+git pull --ff-only origin main
+~~~
 
-## Workflow pengembangan lanjutan
+Jalankan `npm ci` dari `server` jika dependency berubah. Dari folder konfigurasi PM2, jalankan `pm2 restart ecosystem.config.js --only kataflase --update-env`. Restart menghapus room aktif. Tunggu deployment Vercel berstatus **Ready**, cek status API, lalu coba satu ronde dengan tiga pemain dari domain publik.
 
-Perbaikan dan penambahan selanjutnya dikerjakan Rockwell di satu branch tetap: `rockwell/project-maintenance`. Gunakan kembali branch ini untuk setiap tugas; tidak perlu membuat branch baru untuk perubahan kecil.
+## Dokumentasi dan kontribusi
 
-1. Kerjakan perubahan sesuai kebutuhan yang disepakati dan jalankan pemeriksaan yang relevan.
-2. Berhenti pada setiap checkpoint untuk meninjau perubahan, lalu lakukan `git add`, commit deskriptif, dan push. Skills pribadi tetap lokal.
-3. Ajukan PR dari `rockwell/project-maintenance` ke `development`. Gunakan **Create a merge commit** dan pertahankan branch tersebut setelah merge agar dapat dipakai kembali. Versi stabil masuk ke `main` melalui PR dari `development`.
-4. Sebelum tugas berikutnya, pastikan perubahan lokal sudah di-commit, lalu sinkronkan branch tetap dengan `development` terbaru:
+- [PRD](docs/PRD.md) menjelaskan aturan, cakupan, dan kriteria penerimaan.
+- [ADR](docs/ADR.md) menjelaskan keputusan arsitektur, penyimpanan, dan batas akses.
+- [Dokumentasi API](server/API.md) memuat endpoint REST, event Socket.IO, payload, dan respons.
+- [README client](client/README.md) menjelaskan rute, state, dan langkah uji dari browser.
 
-```sh
-git switch rockwell/project-maintenance
-git fetch origin
-git merge --ff-only origin/development
-```
-
-Jangan push langsung ke `main`. Kontribusi awal ketiga developer tetap tercatat dalam riwayat Git.
+Kataflase dibuat sebagai Group Project Hacktiv8 Full Stack JavaScript Phase 2. Perbaikan lanjutan dikerjakan di `rockwell/project-maintenance`. Setelah pemeriksaan lokal, ajukan PR ke `development`, lalu ajukan versi stabil dari `development` ke `main`. Gunakan **Create a merge commit** untuk mempertahankan commit asli anggota tim. Sinkronkan maintenance dengan `origin/development` setelah merge, misalnya dengan `git fetch origin` lalu `git merge --ff-only origin/development` dari branch maintenance.

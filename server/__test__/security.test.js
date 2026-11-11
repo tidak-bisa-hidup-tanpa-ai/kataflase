@@ -60,3 +60,13 @@ test("parser mempertahankan pemeriksaan hash pasangan ronde terakhir", () => {
     assert.deepEqual(parseAndValidateResponse('{"wordA":"Soto","wordB":"Bakso"}', lastPair), { wordA: "Soto", wordB: "Bakso" });
   }
 });
+
+test("parser menolak kata yang tidak dapat dipakai untuk memberi petunjuk", () => {
+  for (const wordA of ["!!!", "🎉", "Kopi\nPahit", "K\u200bopi"]) {
+    assert.throws(() => parseAndValidateResponse(JSON.stringify({ wordA, wordB: "Teh" })), /AI_INVALID_WORDS/);
+  }
+  assert.deepEqual(
+    parseAndValidateResponse('{"wordA":"Laba-laba","wordB":"Semut Merah"}'),
+    { wordA: "Laba-laba", wordB: "Semut Merah" },
+  );
+});

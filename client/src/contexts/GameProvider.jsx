@@ -170,10 +170,14 @@ export function GameProvider({ children }) {
       boundRef.current = false
       setConnected(false)
     }
+    function onConnectError() {
+      onDisconnect()
+      if (sessionRef.current) setStatus('error')
+    }
 
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
-    socket.on('connect_error', onDisconnect)
+    socket.on('connect_error', onConnectError)
     socket.on('room:state', receiveRoom)
     socket.on('player:state', receivePlayer)
 
@@ -185,7 +189,7 @@ export function GameProvider({ children }) {
       clearTimeout(timer)
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
-      socket.off('connect_error', onDisconnect)
+      socket.off('connect_error', onConnectError)
       socket.off('room:state', receiveRoom)
       socket.off('player:state', receivePlayer)
     }

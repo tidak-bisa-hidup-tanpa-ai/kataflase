@@ -131,7 +131,9 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
     assert.deepEqual(Object.keys(personal).sort(), ["hasVoted", "roundId", "word"]);
     assert.equal(typeof client.session.playerId, "number");
   }
+  const snapshotsBeforeRejectedAction = team[1].states.length;
   await error(team[1], "vote:submit", { roundId, targetPlayerId: first.playerId }, "INVALID_PHASE");
+  assert.equal(team[1].states.length, snapshotsBeforeRejectedAction);
   await error(team[1], "clue:hint", { roundId }, "INVALID_PHASE");
   await error(outsider, "clue:hint", { roundId }, "INVALID_ROUND");
   await error(outsider, "clue:submit", { roundId, text: "unik" }, "INVALID_ROUND");
@@ -141,6 +143,7 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
     await until(() => state(client).currentTurnPlayerId === id, "clue turn");
     const waiting = team.find((member) => member !== client);
     await error(waiting, "clue:hint", { roundId }, "NOT_YOUR_TURN");
+    const snapshotsBeforeHint = client.states.length;
     const hints = await Promise.all([
       send(client, "clue:hint", { roundId }),
       send(client, "clue:hint", { roundId }),
@@ -149,6 +152,7 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
     assert.equal(hints[0].data.source, "fallback");
     assert.ok(hints[0].data.hint);
     assert.deepEqual(hints[0], hints[1]);
+    assert.equal(client.states.length, snapshotsBeforeHint);
     await error(client, "clue:submit", { roundId, text: [...words[id]].join(" . ") }, "INVALID_CLUE");
     const replies = await Promise.all([
       send(client, "clue:submit", { roundId, text: "unik" }),
