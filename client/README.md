@@ -13,7 +13,7 @@ cp -n .env.example .env
 npm run dev
 ```
 
-Isi `VITE_SERVER_URL` dengan URL server Express + Socket.IO. Nilai bawaan adalah `http://localhost:3000`; Vite berjalan di `http://localhost:5173`.
+Vite berjalan di `http://localhost:5173` dan secara bawaan memakai server `http://localhost:3000` saat development. Build produksi memakai `https://kataflase-server.dipatipaw.web.id`. Isi `VITE_SERVER_URL` hanya untuk mengganti URL bawaan pada REST dan Socket.IO.
 
 ```bash
 npm run lint
@@ -23,7 +23,7 @@ npm run build
 
 Tes client memeriksa render clue, kandidat voting, hasil menggunakan snapshot server, serta CSS layout mobile dan desktop yang benar-benar dihasilkan saat build. Pengujian permainan lengkap tetap dilakukan dengan server dan beberapa browser.
 
-Fallback rute SPA tersedia untuk Netlify (`public/_redirects`) dan Vercel (`vercel.json`). Saat deployment, isi `VITE_SERVER_URL` sebelum build dan sesuaikan `CLIENT_ORIGIN` pada server dengan origin client.
+Fallback rute SPA tersedia untuk Netlify (`public/_redirects`) dan Vercel (`vercel.json`). Lihat [langkah rilis EC2 dan Vercel](../README.md#rilis-ec2-dan-vercel) untuk pengaturan origin.
 
 ## Kompatibilitas Tailwind di Windows
 

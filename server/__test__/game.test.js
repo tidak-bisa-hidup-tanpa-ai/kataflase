@@ -21,12 +21,16 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
   const clients = [];
   let server;
   let url;
+  const clientOrigin = "https://kataflase-client.example";
   async function startServer() {
     let output = "";
     server = spawn(process.execPath, ["bin/www.js"], {
       cwd: path.join(__dirname, ".."), windowsHide: true,
       // Lewati .env lokal agar tes fallback tidak memakai key Gemini pengguna.
-      env: { ...process.env, NODE_ENV: "production", PORT: "0", GEMINI_API_KEY: "" },
+      env: {
+        ...process.env, NODE_ENV: "production", PORT: "0", GEMINI_API_KEY: "",
+        CLIENT_ORIGIN: ` ${clientOrigin}/ `,
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
     server.stdout.on("data", (chunk) => { output += chunk; });
@@ -83,8 +87,14 @@ test("room, satu ronde, replay, dan restart berjalan tanpa database", { timeout:
 
   await startServer();
   assert.deepEqual(await (await fetch(`${url}/health`)).json(), { data: { status: "ok" } });
-  assert.ok((await (await fetch(`${url}/api/game-options`)).json()).data.categories.includes("acak"));
-  const rejected = await fetch(url + "/socket.io/?EIO=4&transport=polling", {
+  const options = await fetch(`${url}/api/game-options`, { headers: { Origin: clientOrigin } });
+  assert.equal(options.headers.get("access-control-allow-origin"), clientOrigin);
+  assert.ok((await options.json()).data.categories.includes("acak"));
+  const handshakeUrl = url + "/socket.io/?EIO=4&transport=polling";
+  const accepted = await fetch(handshakeUrl, { headers: { Origin: clientOrigin } });
+  assert.equal(accepted.status, 200);
+  assert.match(await accepted.text(), /^0\{/);
+  const rejected = await fetch(handshakeUrl, {
     headers: { Origin: "https://outside.example" },
   });
   assert.equal(rejected.status, 403);
