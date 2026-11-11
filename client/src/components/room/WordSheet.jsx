@@ -20,7 +20,7 @@ export default function WordSheet({ open, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-ink/60 p-4 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-scrim/60 p-4 sm:items-center"
       onClick={onClose}
     >
       <div

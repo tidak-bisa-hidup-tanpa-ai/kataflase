@@ -36,12 +36,15 @@ Setelah mengganti versi dependency, hentikan Vite yang masih berjalan dengan `Ct
 ```text
 __test__/                   Pemeriksaan integrasi data server dengan komponen
 src/
-  main.jsx                  Root React, GameProvider, dan stylesheet global
+  main.jsx                  Root React, provider Redux dan Context, stylesheet global
+  app/store.js              Store Redux
+  features/game/gameSlice.js Snapshot publik room dari server
   App.jsx                   Router: /, /rooms/:code, /rooms/:code/result
   constant/                 URL server, fase, batas, pesan error
   socket/index.js           Instance socket.io-client
   contexts/GameContext.js   Context dan hook useGame
-  contexts/GameProvider.jsx Sesi, socket, snapshot publik, state privat, aksi
+  contexts/GameProvider.jsx Sesi, listener socket, state privat, aksi
+  contexts/ThemeProvider.jsx Tema terang/gelap lokal
   pages/BaseLayout.jsx      ConnectionBanner dan container bersama dengan Outlet
   pages/                    HomePage, RoomPage, ResultPage, NotFoundPage
   components/RoomGate.jsx   Sesi kedaluwarsa, tautan langsung, resume
@@ -50,7 +53,7 @@ src/
   helpers/                  Session, room, toast, countdown, keluar room
 ```
 
-Halaman berada di `pages/` dan bagian UI yang dipakai halaman berada di `components/`, mengikuti pola GC02 dan Rewear. `App.jsx` mendefinisikan rute; `BaseLayout` menampilkan `Outlet`. `GameProvider` dipasang satu kali di `main.jsx` agar sesi tetap tersedia ketika halaman berubah. Pemanggilan REST kategori memakai Axios langsung di `LobbyPhase` dengan `async/await` dan `try/catch`. Komunikasi socket bersama tetap dikelola Context.
+Halaman berada di `pages/` dan bagian UI yang dipakai halaman berada di `components/`, mengikuti pola GC02 dan Rewear. `App.jsx` mendefinisikan rute; `BaseLayout` menampilkan `Outlet`. `GameProvider` dipasang satu kali di `main.jsx` agar sesi tetap tersedia ketika halaman berubah. Pemanggilan REST kategori memakai Axios langsung di `LobbyPhase` dengan `async/await` dan `try/catch`. Listener di `GameProvider` mengirim snapshot publik `room:state` ke Redux. `useGame()` meneruskan data itu ke komponen tanpa salinan state room di Context. `player:state` tetap di client pemain terkait dan token sesi tetap di `sessionStorage`. Tema terang/gelap dikelola `ThemeContext`, disimpan di `localStorage`, dan berlaku untuk semua halaman melalui token CSS.
 
 ## Kontrak integrasi
 
