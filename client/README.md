@@ -1,123 +1,80 @@
 # Kataflase — Client
 
-SPA Vite + React untuk Kataflase. Lihat [PRD](../PRD.md) dan [ADR](../ADR.md).
+SPA Vite + React untuk Kataflase. Lihat [PRD](../docs/PRD.md), [ADR](../docs/ADR.md), dan [kontrak API server](../server/API.md).
 
 ## Menjalankan
 
+Jalankan server terlebih dahulu mengikuti dokumentasi server, lalu buka terminal lain:
+
 ```bash
 cd client
-npm install
-cp .env.example .env   # isi VITE_SERVER_URL dengan URL server
+npm ci
+cp -n .env.example .env
 npm run dev
 ```
 
-| Variabel          | Contoh                  | Keterangan                         |
-| ----------------- | ----------------------- | ---------------------------------- |
-| `VITE_SERVER_URL` | `http://localhost:3000` | URL server Express + Socket.IO     |
+Isi `VITE_SERVER_URL` dengan URL server Express + Socket.IO. Nilai bawaan adalah `http://localhost:3000`; Vite berjalan di `http://localhost:5173`.
 
-Fallback rute SPA sudah disiapkan untuk Netlify (`public/_redirects`) dan Vercel (`vercel.json`).
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+Tes client memeriksa render clue, kandidat voting, hasil menggunakan snapshot server, serta CSS layout mobile dan desktop yang benar-benar dihasilkan saat build. Pengujian permainan lengkap tetap dilakukan dengan server dan beberapa browser.
+
+Fallback rute SPA tersedia untuk Netlify (`public/_redirects`) dan Vercel (`vercel.json`). Saat deployment, isi `VITE_SERVER_URL` sebelum build dan sesuaikan `CLIENT_ORIGIN` pada server dengan origin client.
+
+## Kompatibilitas Tailwind di Windows
+
+`tailwindcss` dan `@tailwindcss/vite` dikunci ke `4.2.4`. Pada Windows yang dipakai untuk pengujian, Application Control memblokir pemindai native versi `4.3.5`; fallback-nya tidak membaca source sehingga layout kehilangan utility CSS meskipun build berhasil. Versi `4.2.4` sudah diuji menghasilkan utility tersebut tanpa mengubah pengaturan keamanan Windows.
+
+Setelah mengganti versi dependency, hentikan Vite yang masih berjalan dengan `Ctrl+C`, lalu jalankan `npm run dev -- --force`. Jika memperbarui Tailwind nanti, perbarui kedua paket bersama dan jalankan `npm test` untuk memastikan utility CSS tetap terbentuk.
 
 ## Struktur
 
-```
+```text
+__test__/                   Pemeriksaan integrasi data server dengan komponen
 src/
+  main.jsx                  Root React, provider Redux dan Context, stylesheet global
+  app/store.js              Store Redux
+  features/game/gameSlice.js Snapshot publik room dari server
   App.jsx                   Router: /, /rooms/:code, /rooms/:code/result
-  constant/                 url (SERVER_URL), game (fase, batas), errors (pesan error)
+  constant/                 URL server, fase, batas, pesan error
   socket/index.js           Instance socket.io-client
-  contexts/GameContext.js   createContext + hook useGame
-  contexts/GameProvider.jsx Sesi, socket, snapshot publik, state privat, aksi
-  views/                    HomePage, RoomPage, ResultPage, NotFoundPage
+  contexts/GameContext.js   Context dan hook useGame
+  contexts/GameProvider.jsx Sesi, listener socket, state privat, aksi
+  contexts/ThemeProvider.jsx Tema terang/gelap lokal
+  pages/BaseLayout.jsx      ConnectionBanner dan container bersama dengan Outlet
+  pages/                    HomePage, RoomPage, ResultPage, NotFoundPage
   components/RoomGate.jsx   Sesi kedaluwarsa, tautan langsung, resume
-  components/room/          Header room, fase, pemain, kartu kata, clue, chat
+  components/room/          Header, pemain, kata, clue, chat
   components/phases/        Lobby, WordReveal, Clue, Discussion, Voting
-  helpers/                  api, session, room, toast, useCountdown
+  helpers/                  Session, room, toast, countdown
 ```
 
-## Kontrak data yang dipakai client
+Halaman berada di `pages/` dan bagian UI yang dipakai halaman berada di `components/`, mengikuti pola GC02 dan Rewear. `App.jsx` mendefinisikan rute; `BaseLayout` menampilkan `Outlet`. `GameProvider` dipasang satu kali di `main.jsx` agar sesi tetap tersedia ketika halaman berubah. Pemanggilan REST kategori memakai Axios langsung di `LobbyPhase` dengan `async/await` dan `try/catch`. Listener di `GameProvider` mengirim snapshot publik `room:state` ke Redux. `useGame()` meneruskan data itu ke komponen tanpa salinan state room di Context. `player:state` tetap di client pemain terkait dan token sesi tetap di `sessionStorage`. Tema terang/gelap dikelola `ThemeContext`, disimpan di `localStorage`, dan berlaku untuk semua halaman melalui token CSS.
 
-Client mengikuti kontrak di ADR. Bentuk field di bawah adalah usulan client dan perlu disepakati dengan server.
+## Kontrak integrasi
 
-### Jumlah pemain
+Client mengikuti [API server](../server/API.md) sebagai acuan payload:
 
-Room bisa mulai dengan **4–12 pemain** online (`MIN_PLAYERS` dan `MAX_PLAYERS` di `src/constant/game.js`). Server juga harus memakai batas yang sama: tolak start di bawah 4 pemain (`NOT_ENOUGH_PLAYERS`) dan tolak pemain ke-13 (`ROOM_FULL`).
+- Room berisi **3–6 pemain**. Hanya host yang dapat memulai, ketika semua anggota online.
+- ACK sukses berbentuk `{ ok: true, data }`; penolakan berbentuk `{ ok: false, error: { code, message } }`.
+- Create/join mengembalikan `{ code, playerId, sessionToken }`. Sesi disimpan per tab di `sessionStorage`; resume mengirim `{ code, sessionToken }`.
+- `room:leave` dikirim tanpa payload, dengan callback ACK.
+- ID pemain berupa angka. `players` dan `participants` berisi objek dengan `playerId` dan `nickname`; peserta ronde tetap menjadi kandidat meskipun sudah keluar.
+- `GET /api/game-options` mengembalikan `{ data: { categories: [...] } }`. Kategori acak bernilai `acak`.
+- Snapshot `room:state` mengganti state publik; revisi yang lebih lama diabaikan. Progres voting memakai `voting.submitted` dan `voting.total`.
+- Kata sendiri berasal dari `player:state` dan hanya ditampilkan ketika `roundId` cocok.
+- Saat `RESULT`, kata dan suara memakai `result.playerWords` dan `result.voteTally`. Pemenang bernilai `CIVILIANS` atau `IMPOSTOR`.
+- Main Lagi membersihkan ronde dan mempertahankan room. Restart server menghapus seluruh room; sesi lama ditolak dan pemain harus membuat atau bergabung ke room baru.
 
-### ACK semua event client → server
+## Pemeriksaan manual integrasi
 
-```js
-{ ok: true, data: { ... } }
-{ ok: false, code: 'NOT_YOUR_TURN', message: 'opsional' }
-```
-
-| Event           | Payload                         | `data` saat sukses                       |
-| --------------- | ------------------------------- | ---------------------------------------- |
-| `room:create`   | `{ nickname }`                  | `{ code, playerId, token }`              |
-| `room:join`     | `{ code, nickname }`            | `{ code, playerId, token }`              |
-| `room:resume`   | `{ code, token }`               | `{}` (opsional `{ room, player }`)       |
-| `room:leave`    | `{ code }`                      | `{}`                                     |
-| `game:start`    | `{ category }` (`'random'` = Acak) | `{}`                                  |
-| `game:restart`  | `{ roundId }`                   | `{}`                                     |
-| `clue:submit`   | `{ roundId, text }`             | `{}`                                     |
-| `chat:send`     | `{ roundId, text }`             | `{}`                                     |
-| `vote:submit`   | `{ roundId, targetPlayerId }`   | `{}`                                     |
-
-Kode error yang sudah punya pesan di client ada di `src/constant/errors.js`. Kode `SESSION_EXPIRED`, `INVALID_SESSION`, `NOT_IN_ROOM`, dan `ROOM_NOT_FOUND` membuat client menghapus sesi dan menampilkan jalan kembali ke Home.
-
-### `room:state` (server → room)
-
-```json
-{
-  "code": "KOPI42",
-  "revision": 17,
-  "serverNow": "2026-11-11T08:00:00.000Z",
-  "hostId": "p1",
-  "phase": "VOTING",
-  "isStarting": false,
-  "players": [
-    { "id": "p1", "nickname": "Ani", "online": true, "joinOrder": 1 },
-    { "id": "p2", "nickname": "Budi", "online": false, "joinOrder": 2 }
-  ],
-  "roundId": "r-abc",
-  "participants": ["p1", "p2", "p3", "p4"],
-  "turnOrder": ["p3", "p1", "p4", "p2"],
-  "currentTurnPlayerId": null,
-  "deadlineAt": "2026-11-11T08:00:45.000Z",
-  "clues": [
-    { "playerId": "p3", "text": "pagi" },
-    { "playerId": "p1", "text": null, "skipped": true }
-  ],
-  "chat": [{ "id": "m1", "playerId": "p2", "text": "Kok daun?", "sentAt": "…" }],
-  "voteProgress": { "voted": 3, "total": 4 },
-  "result": null
-}
-```
-
-Saat `phase` = `RESULT`:
-
-```json
-"result": {
-  "impostorId": "p2",
-  "winner": "CIVILIAN",
-  "reason": "Budi mendapat suara terbanyak dan dia impostor.",
-  "words": [{ "playerId": "p1", "word": "Kopi" }, { "playerId": "p2", "word": "Teh" }],
-  "tally": [{ "playerId": "p2", "votes": 3 }, { "playerId": "p1", "votes": 0 }],
-  "abstainCount": 1
-}
-```
-
-`winner` bernilai `CIVILIAN` atau `IMPOSTOR`. Di lobby (`WAITING`), field ronde boleh `null` atau array kosong. Client mengabaikan snapshot dengan `revision` lebih kecil dari yang sudah diterima.
-
-### `player:state` (server → pemain)
-
-```json
-{ "roundId": "r-abc", "word": "Kopi", "hasVoted": false }
-```
-
-Kata hanya ditampilkan jika `roundId` sama dengan `room:state.roundId`.
-
-### `GET /api/game-options`
-
-```json
-{ "categories": [{ "id": "makanan", "label": "Makanan & Minuman" }] }
-```
-
-Client selalu menambahkan opsi **Acak** (`id: "random"`) di urutan pertama.
+1. Buka tiga tab atau browser. Buat room, gabungkan dua pemain lain, dan periksa host serta daftar pemain.
+2. Pilih kategori dan mulai. Periksa kata pribadi, urutan clue, chat diskusi, penguncian vote, progres, dan hasil yang sama pada ketiganya.
+3. Refresh salah satu pemain saat ronde berjalan. Kata, giliran, dan status vote tetap pulih selama proses server belum berhenti.
+4. Keluar sebagai host dan pastikan host berpindah. Peserta yang keluar saat ronde tetap muncul pada clue, voting, dan hasil.
+5. Klik Main Lagi. Kode dan sesi tetap, sedangkan kata, clue, chat, vote, dan hasil lama hilang.
+6. Restart server. Sesi lama berakhir dengan pesan yang jelas; room baru dapat dibuat dan diikuti kembali.

@@ -5,9 +5,9 @@ import Mascot from '../components/ui/Mascot'
 import { errorMessage } from '../constant/errors'
 import { PHASES } from '../constant/game'
 import { useGame } from '../contexts/GameContext'
-import { playerName, toMap } from '../helpers/room'
+import { playerName } from '../helpers/room'
 import { toast } from '../helpers/toast'
-import { useLeaveRoom } from '../helpers/useLeaveRoom'
+import LeaveRoomButton from '../components/room/LeaveRoomButton'
 
 function defaultReason(result, room) {
   const impostor = playerName(room, result.impostorId)
@@ -26,7 +26,6 @@ function majorityWord(rows, impostorId) {
 
 function ResultView() {
   const { room, playerId, isHost, restartGame, canAct } = useGame()
-  const leave = useLeaveRoom()
   const [busy, setBusy] = useState(false)
 
   if (room.phase !== PHASES.RESULT) {
@@ -35,11 +34,12 @@ function ResultView() {
 
   const result = room.result ?? {}
   const impostorWins = result.winner === 'IMPOSTOR'
-  const words = toMap(result.words, 'word')
-  const tally = toMap(result.tally, 'votes')
-  const ids = room.participants?.length ? room.participants : room.players.map((p) => p.id)
-  const rows = ids
-    .map((id) => ({ id, word: words.get(id), votes: Number(tally.get(id) ?? 0) }))
+  const words = result.playerWords ?? {}
+  const tally = result.voteTally ?? {}
+  const participants = room.participants ?? []
+  const abstainCount = Math.max(0, participants.length - (room.voting?.submitted ?? 0))
+  const rows = participants
+    .map(({ playerId: id }) => ({ id, word: words[id], votes: Number(tally[id] ?? 0) }))
     .sort((a, b) => b.votes - a.votes)
   const maxVotes = Math.max(1, ...rows.map((row) => row.votes))
   const iAmImpostor = result.impostorId === playerId
@@ -99,7 +99,7 @@ function ResultView() {
         </div>
         <div className="card rotate-2 bg-flame px-3 py-3 shadow-[3px_3px_0_var(--color-ink)]">
           <p className="label text-[10px]">Kata impostor</p>
-          <p className="display mt-2 text-3xl wrap-break-word">{words.get(result.impostorId) ?? '—'}</p>
+          <p className="display mt-2 text-3xl wrap-break-word">{words[result.impostorId] ?? '—'}</p>
         </div>
       </div>
       </section>
@@ -126,8 +126,8 @@ function ResultView() {
           </li>
         ))}
       </ul>
-      {Number(result.abstainCount) > 0 && (
-        <p className="mt-3 font-mono text-[11px] text-muted">{result.abstainCount} pemain abstain</p>
+      {abstainCount > 0 && (
+        <p className="mt-3 font-mono text-[11px] text-muted">{abstainCount} pemain abstain</p>
       )}
 
       <p className="mt-5 text-[13px] leading-relaxed">{result.reason || defaultReason(result, room)}</p>
@@ -150,13 +150,9 @@ function ResultView() {
         <p className="mt-2 text-center font-mono text-[10px] text-muted">
           Kode room dan anggota tetap sama.
         </p>
-        <button
-          type="button"
-          className="mt-4 w-full text-center text-sm text-muted underline underline-offset-2"
-          onClick={leave}
-        >
+        <LeaveRoomButton className="mt-4 w-full text-center text-sm text-muted underline underline-offset-2">
           Keluar dari room
-        </button>
+        </LeaveRoomButton>
       </div>
       </section>
       </div>

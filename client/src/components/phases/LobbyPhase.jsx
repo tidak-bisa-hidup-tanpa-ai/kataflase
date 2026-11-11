@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
+import axios from 'axios'
 import { errorMessage } from '../../constant/errors'
 import { MAX_PLAYERS, MIN_PLAYERS, RANDOM_CATEGORY } from '../../constant/game'
 import { useGame } from '../../contexts/GameContext'
-import { getGameOptions } from '../../helpers/api'
+import { SERVER_URL } from '../../constant/url'
 import { toast } from '../../helpers/toast'
-import { useLeaveRoom } from '../../helpers/useLeaveRoom'
+import LeaveRoomButton from '../room/LeaveRoomButton'
 import AppHeader from '../AppHeader'
 import Mascot from '../ui/Mascot'
 import PlayerList from '../room/PlayerList'
 import RoomHeader from '../room/RoomHeader'
+
+const CUSTOM_CATEGORY = { id: 'custom', label: 'Kategori Sendiri' }
+const CUSTOM_CATEGORY_MAX = 50
 
 function startBlocker(room) {
   const players = room.players ?? []
@@ -23,32 +27,40 @@ function startBlocker(room) {
 
 export default function LobbyPhase() {
   const { room, isHost, startGame, canAct } = useGame()
-  const leave = useLeaveRoom()
   const [options, setOptions] = useState([RANDOM_CATEGORY])
   const [category, setCategory] = useState(RANDOM_CATEGORY.id)
+  const [customCategory, setCustomCategory] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let active = true
-    getGameOptions()
-      .then((list) => {
-        if (active) setOptions(list)
-      })
-      .catch(() => {
+    async function fetchGameOptions() {
+      try {
+        const { data } = await axios.get(`${SERVER_URL}/api/game-options`, { timeout: 5000 })
+        const categories = data.data.categories
+          .filter((id) => id !== RANDOM_CATEGORY.id)
+          .map((id) => ({ id, label: id }))
+        if (active) setOptions([RANDOM_CATEGORY, ...categories])
+      } catch {
         if (active) toast('Gagal memuat kategori. "Acak" tetap bisa dipakai.', 'error')
-      })
+      }
+    }
+
+    fetchGameOptions()
     return () => {
       active = false
     }
   }, [])
 
   const onlineCount = (room.players ?? []).filter((p) => p.online).length
-  const blocker = startBlocker(room)
+  const isCustom = category === CUSTOM_CATEGORY.id
+  const customName = customCategory.trim()
+  const blocker = startBlocker(room) ?? (isCustom && !customName ? 'Isi nama kategori untuk mulai' : null)
   const status = blocker ?? `${onlineCount} pemain online · siap mulai`
 
   async function onStart() {
     setBusy(true)
-    const res = await startGame(category)
+    const res = await startGame(category, isCustom ? customName : undefined)
     setBusy(false)
     if (!res.ok) toast(errorMessage(res), 'error')
   }
@@ -57,9 +69,7 @@ export default function LobbyPhase() {
     <div>
       <AppHeader
         right={
-          <button type="button" className="pill" onClick={leave}>
-            Keluar
-          </button>
+          <LeaveRoomButton className="pill">Keluar</LeaveRoomButton>
         }
       />
       <div className="lg:mt-4 lg:grid lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-12">
@@ -74,7 +84,7 @@ export default function LobbyPhase() {
         <section className="mt-6">
           <h2 className="label">Kategori</h2>
           <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Kategori kata">
-            {options.map((option) => {
+            {[...options, CUSTOM_CATEGORY].map((option) => {
               const active = category === option.id
               return (
                 <button
@@ -93,6 +103,20 @@ export default function LobbyPhase() {
               )
             })}
           </div>
+          {isCustom && (
+            <div className="mt-4">
+              <label htmlFor="custom-category" className="label">Nama Kategori</label>
+              <input
+                id="custom-category"
+                className="input mt-2"
+                value={customCategory}
+                maxLength={CUSTOM_CATEGORY_MAX}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                placeholder="Contoh: Futsal"
+                disabled={busy || room.isStarting}
+              />
+            </div>
+          )}
         </section>
       )}
 

@@ -1,11 +1,11 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* Arah visual: cetak riso salah register. Kata yang sama dicetak tajam,
    kata yang berbeda dicetak geser dua warna. */
 @theme {
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Bricolage Grotesque', 'Plus Jakarta Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Plus Jakarta Sans", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --color-paper: #f2eadb;
   --color-card: #fffaf0;
@@ -29,12 +29,30 @@
       transform: translateY(-4px) rotate(-1.5deg);
     }
   }
+
+  --color-online: oklch(50.8% 0.118 165.612);
+  --color-scrim: var(--color-ink);
 }
 
 @layer base {
   html {
     color-scheme: light;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --color-paper: #17162b;
+    --color-card: #24223b;
+    --color-ink: #f7efdf;
+    --color-muted: #cbc3d7;
+    --color-sun: #694611;
+    --color-flame: #852e52;
+    --color-cobalt: #aebaff;
+    --color-mint: #24584c;
+    --color-tangerine: #7a4027;
+    --color-online: #88dec0;
+    --color-scrim: #0b0a15;
   }
 
   body {

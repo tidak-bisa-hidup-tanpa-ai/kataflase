@@ -18,7 +18,7 @@ export default function CluePhase() {
   const currentId = room.currentTurnPlayerId
   const submitted = new Set((room.clues ?? []).map((clue) => clue.playerId))
   const isMyTurn = currentId === playerId && !submitted.has(playerId)
-  const isParticipant = (room.participants ?? []).includes(playerId)
+  const isParticipant = (room.participants ?? []).some((p) => p.playerId === playerId)
 
   const title = isMyTurn
     ? 'Giliran kamu'

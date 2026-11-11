@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDispatch, useSelector, useStore } from 'react-redux'
 import { isExpiredCode } from '../constant/errors'
+import { roomCleared, roomReceived, selectRoom } from '../features/game/gameSlice'
 import { clearSession, loadSession, saveSession } from '../helpers/session'
 import { socket } from '../socket'
 import { GameContext } from './GameContext'
 
 const ACK_TIMEOUT_MS = 8000
+const START_ACK_TIMEOUT_MS = 15000
 const CONNECT_TIMEOUT_MS = 6000
 const ROOM_FALLBACK_MS = 2000
 
-// ACK server: { ok: true, data } atau { ok: false, code, message }
+// ACK server: { ok: true, data } atau { ok: false, error: { code, message } }
 function normalizeAck(res) {
   if (res?.ok === true) return { ok: true, data: res.data ?? {} }
   if (res?.ok === false) {
-    return { ok: false, code: res.code ?? 'UNKNOWN', message: res.message }
+    return { ok: false, code: res.error?.code ?? 'UNKNOWN', message: res.error?.message }
   }
   return { ok: false, code: 'UNKNOWN' }
 }
@@ -20,7 +23,9 @@ function normalizeAck(res) {
 async function emitConnected(event, payload) {
   if (!socket.connected) return { ok: false, code: 'NETWORK' }
   try {
-    const res = await socket.timeout(ACK_TIMEOUT_MS).emitWithAck(event, payload)
+    const args = payload === undefined ? [] : [payload]
+    const timeout = event === 'game:start' ? START_ACK_TIMEOUT_MS : ACK_TIMEOUT_MS
+    const res = await socket.timeout(timeout).emitWithAck(event, ...args)
     return normalizeAck(res)
   } catch {
     return { ok: false, code: 'TIMEOUT' }
@@ -50,20 +55,25 @@ async function emitWithAck(event, payload) {
 }
 
 export function GameProvider({ children }) {
+  const dispatch = useDispatch()
+  const store = useStore()
+  const room = useSelector(selectRoom)
   const [session, setSession] = useState(loadSession)
   const [status, setStatus] = useState(session ? 'resuming' : 'idle')
   const [connected, setConnected] = useState(socket.connected)
-  const [room, setRoom] = useState(null)
   const [privateState, setPrivateState] = useState(null)
   const [expiredReason, setExpiredReason] = useState(null)
 
   const sessionRef = useRef(session)
-  const roomRef = useRef(null)
-  const clockOffsetRef = useRef(0)
+  const serverClockRef = useRef(null)
   // true setelah socket saat ini terikat ke sesi (resume/create/join sukses).
   const boundRef = useRef(false)
 
-  const now = useCallback(() => Date.now() + clockOffsetRef.current, [])
+  const now = useCallback(() => {
+    const clock = serverClockRef.current
+    if (!clock) return Date.now()
+    return clock.serverTime + (performance.now() - clock.receivedAt)
+  }, [])
 
   const updateSession = useCallback((next) => {
     sessionRef.current = next
@@ -73,17 +83,16 @@ export function GameProvider({ children }) {
   }, [])
 
   const resetRoom = useCallback(() => {
-    roomRef.current = null
-    setRoom(null)
+    dispatch(roomCleared())
     setPrivateState(null)
-  }, [])
+  }, [dispatch])
 
   const receiveRoom = useCallback((next) => {
     if (!next?.code) return
     const current = sessionRef.current
     if (current && current.code !== next.code) return
 
-    const prev = roomRef.current
+    const prev = selectRoom(store.getState())
     if (
       prev &&
       prev.code === next.code &&
@@ -95,13 +104,12 @@ export function GameProvider({ children }) {
     if (next.serverNow) {
       const serverTime = Date.parse(next.serverNow)
       if (!Number.isNaN(serverTime)) {
-        clockOffsetRef.current = serverTime - Date.now()
+        serverClockRef.current = { serverTime, receivedAt: performance.now() }
       }
     }
 
-    roomRef.current = next
-    setRoom(next)
-  }, [])
+    dispatch(roomReceived(next))
+  }, [dispatch, store])
 
   const receivePlayer = useCallback((next) => {
     if (next) setPrivateState(next)
@@ -137,7 +145,7 @@ export function GameProvider({ children }) {
     }
     const res = await emitConnected('room:resume', {
       code: current.code,
-      token: current.token,
+      sessionToken: current.sessionToken,
     })
     if (sessionRef.current !== current) return
     if (res.ok) {
@@ -186,9 +194,10 @@ export function GameProvider({ children }) {
       const next = {
         code: String(data.code),
         playerId: data.playerId,
-        token: data.token,
+        sessionToken: data.sessionToken,
       }
-      if (roomRef.current && roomRef.current.code !== next.code) resetRoom()
+      const currentRoom = selectRoom(store.getState())
+      if (currentRoom && currentRoom.code !== next.code) resetRoom()
       boundRef.current = true
       updateSession(next)
       setExpiredReason(null)
@@ -197,10 +206,10 @@ export function GameProvider({ children }) {
 
       // Jika room:state belum datang, minta snapshot lewat resume.
       setTimeout(() => {
-        if (sessionRef.current === next && !roomRef.current) resume()
+        if (sessionRef.current === next && !selectRoom(store.getState())) resume()
       }, ROOM_FALLBACK_MS)
     },
-    [resetRoom, updateSession, applyAckData, resume],
+    [resetRoom, updateSession, applyAckData, resume, store],
   )
 
   const leaveRoom = useCallback(async () => {
@@ -210,7 +219,7 @@ export function GameProvider({ children }) {
     resetRoom()
     setExpiredReason(null)
     setStatus('idle')
-    if (current) await emitConnected('room:leave', { code: current.code })
+    if (current) await emitConnected('room:leave')
   }, [updateSession, resetRoom])
 
   const createRoom = useCallback(
@@ -249,28 +258,28 @@ export function GameProvider({ children }) {
   )
 
   const startGame = useCallback(
-    (category) => act('game:start', { category }),
+    (category, customCategory) => act('game:start', { category, customCategory }),
     [act],
   )
 
   const restartGame = useCallback(
-    () => act('game:restart', { roundId: roomRef.current?.roundId }),
-    [act],
+    () => act('game:restart', { roundId: selectRoom(store.getState())?.roundId }),
+    [act, store],
   )
 
   const submitClue = useCallback(
-    (text) => act('clue:submit', { roundId: roomRef.current?.roundId, text }),
-    [act],
+    (text) => act('clue:submit', { roundId: selectRoom(store.getState())?.roundId, text }),
+    [act, store],
   )
 
   const sendChat = useCallback(
-    (text) => act('chat:send', { roundId: roomRef.current?.roundId, text }),
-    [act],
+    (text) => act('chat:send', { roundId: selectRoom(store.getState())?.roundId, text }),
+    [act, store],
   )
 
   const submitVote = useCallback(
     async (targetPlayerId) => {
-      const roundId = roomRef.current?.roundId
+      const roundId = selectRoom(store.getState())?.roundId
       const res = await act('vote:submit', { roundId, targetPlayerId })
       if (res.ok) {
         setPrivateState((prev) => ({
@@ -280,7 +289,7 @@ export function GameProvider({ children }) {
       }
       return res
     },
-    [act],
+    [act, store],
   )
 
   const dismissExpired = useCallback(() => {
@@ -290,7 +299,7 @@ export function GameProvider({ children }) {
 
   const value = useMemo(() => {
     const playerId = session?.playerId ?? null
-    const me = room?.players?.find((p) => p.id === playerId) ?? null
+    const me = room?.players?.find((p) => p.playerId === playerId) ?? null
     // Kata hanya ditampilkan jika roundId cocok dengan ronde yang aktif.
     const activePrivate =
       privateState && room?.roundId && privateState.roundId === room.roundId

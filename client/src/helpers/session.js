@@ -8,7 +8,7 @@ export function loadSession() {
     const raw = sessionStorage.getItem(SESSION_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (parsed?.code && parsed?.playerId && parsed?.token) return parsed
+    if (parsed?.code && parsed?.playerId && parsed?.sessionToken) return parsed
     return null
   } catch {
     return null

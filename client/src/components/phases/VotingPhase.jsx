@@ -16,10 +16,10 @@ export default function VotingPhase() {
   const [busy, setBusy] = useState(false)
 
   const participants = room.participants ?? []
-  const isParticipant = participants.includes(playerId)
-  const candidates = participants.filter((id) => id !== playerId)
+  const isParticipant = participants.some((p) => p.playerId === playerId)
+  const candidates = participants.filter((p) => p.playerId !== playerId)
   const voted = hasVoted || lockedTarget !== null
-  const progress = room.voteProgress ?? { voted: 0, total: participants.length }
+  const progress = room.voting ?? { submitted: 0, total: participants.length }
   const chosen = lockedTarget ?? selected
 
   async function onVote() {
@@ -46,12 +46,12 @@ export default function VotingPhase() {
           {Array.from({ length: progress.total }, (_, index) => (
             <span
               key={index}
-              className={`size-2.5 rounded-full border-2 border-ink ${index < progress.voted ? 'bg-ink' : 'bg-card'}`}
+              className={`size-2.5 rounded-full border-2 border-ink ${index < progress.submitted ? 'bg-ink' : 'bg-card'}`}
             />
           ))}
         </span>
         <span className="font-mono text-[11px]">
-          {progress.voted} dari {progress.total} sudah memilih
+          {progress.submitted} dari {progress.total} sudah memilih
         </span>
       </div>
 
@@ -70,9 +70,9 @@ export default function VotingPhase() {
             <Mascot mood={voted ? 'happy' : 'panic'} className="w-14 shrink-0 motion-safe:animate-bob" />
           </div>
           <ul className="mt-2 space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0" role="radiogroup" aria-label="Kandidat impostor">
-            {candidates.map((id) => {
+            {candidates.map(({ playerId: id }) => {
               const active = chosen === id
-              const player = room.players.find((p) => p.id === id)
+              const player = room.players.find((p) => p.playerId === id)
               return (
                 <li key={id}>
                   <button
@@ -88,7 +88,7 @@ export default function VotingPhase() {
                     <Avatar room={room} playerId={id} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-base font-bold">{playerName(room, id)}</span>
-                      {player && !player.online && (
+                      {!player?.online && (
                         <span className="block font-mono text-[10px] text-ink/70">
                           offline · tetap bisa dipilih
                         </span>

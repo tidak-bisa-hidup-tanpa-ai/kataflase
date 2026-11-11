@@ -17,7 +17,7 @@ export const ROUND_PHASES = new Set([
 export const PHASE_INFO = {
   WAITING: {
     label: 'Lobby',
-    hint: 'Ajak 4–12 pemain bergabung dengan kode room.',
+    hint: 'Ajak 3–6 pemain bergabung dengan kode room.',
   },
   WORD_REVEAL: {
     label: 'Kata Rahasia',
@@ -41,14 +41,14 @@ export const PHASE_INFO = {
   },
 }
 
-export const MIN_PLAYERS = 4
-export const MAX_PLAYERS = 12
+export const MIN_PLAYERS = 3
+export const MAX_PLAYERS = 6
 export const NICKNAME_MAX = 16
 export const ROOM_CODE_MAX = 8
 export const CLUE_MAX = 30
 export const CHAT_MAX = 200
 
-export const RANDOM_CATEGORY = { id: 'random', label: 'Acak' }
+export const RANDOM_CATEGORY = { id: 'acak', label: 'Acak' }
 
 // Nilai awal PRD; dipakai untuk bar waktu jika server tidak mengirim durasi.
 export const PHASE_DURATIONS = {
