@@ -26,7 +26,7 @@ export default function PlayerList() {
               <span className="pill bg-sun px-2 py-0.5 text-[10px]">Host</span>
             )}
             <span
-              className={`font-mono text-[11px] ${player.online ? 'text-emerald-700' : 'text-muted'}`}
+              className={`font-mono text-[11px] ${player.online ? 'text-online' : 'text-muted'}`}
             >
               {player.online ? '● online' : '○ offline'}
             </span>

@@ -6,7 +6,7 @@ Express dan Socket.IO menggunakan port yang sama.
 
 ## Penyimpanan room
 
-Room, sesi pemain, dan ronde disimpan di memory satu proses Node.js. Aplikasi tidak memakai database. Saat deployment, gunakan satu instance server dan atur `CLIENT_ORIGIN` serta `GEMINI_API_KEY` melalui environment hosting. Hosting dapat menyediakan `PORT`.
+Room, sesi pemain, dan ronde disimpan di memory satu proses Node.js. Aplikasi tidak memakai database. Saat deployment, gunakan satu instance server dan atur `CLIENT_ORIGIN` serta `GEMINI_API_KEY` melalui environment hosting. Hosting dapat menyediakan `PORT`. Handshake Socket.IO dengan header `Origin` hanya menerima nilai yang sama dengan `CLIENT_ORIGIN`. Klien tanpa header `Origin` tetap tunduk pada aturan sesi dan batas percobaan.
 
 Restart, crash, atau redeploy menghapus semua room dan ronde. Kode room lama tidak dapat digunakan lagi. Client yang mencoba `room:resume` dengan sesi lama menerima `SESSION_EXPIRED`; `room:join` ke room yang hilang menerima `ROOM_NOT_FOUND`. Host membuat room baru dan pemain lain memasukkan kode baru. Refresh browser atau reconnect tetap dapat memulihkan sesi selama proses server yang sama masih berjalan dan sesi valid.
 
@@ -46,13 +46,13 @@ ACK sukses untuk create, join, atau resume hanya dikirim ke socket yang meminta.
 }
 ```
 
-ACK gagal memakai `{ "ok": false, "error": { "code": "ROOM_FULL", "message": "Room sudah penuh." } }`. Kode lain yang dapat diterima adalah `INVALID_NICKNAME`, `INVALID_ROOM_CODE`, `ALREADY_IN_ROOM`, `ROOM_NOT_FOUND`, `ROUND_IN_PROGRESS`, `NOT_IN_ROOM`, `SESSION_EXPIRED`, dan `INTERNAL_SERVER_ERROR`.
+ACK gagal memakai `{ "ok": false, "error": { "code": "ROOM_FULL", "message": "Room sudah penuh." } }`. Kode lain yang dapat diterima adalah `INVALID_NICKNAME`, `INVALID_ROOM_CODE`, `ROOM_CAPACITY`, `ROOM_CREATE_LIMIT`, `ALREADY_IN_ROOM`, `ROOM_NOT_FOUND`, `ROUND_IN_PROGRESS`, `NOT_IN_ROOM`, `SESSION_EXPIRED`, dan `INTERNAL_SERVER_ERROR`.
 
-Server mengirim `room:state` terbaru ke anggota room setelah create, join, resume, leave, atau pembaruan presence. `online` menunjukkan status koneksi saat snapshot dibuat.
+Server mengirim `room:state` terbaru ke anggota room setelah create, join, resume, leave, atau pembaruan presence. `online` menunjukkan status koneksi saat snapshot dibuat. `serverNow` berisi waktu server saat snapshot dikirim dalam format ISO dan menjadi acuan hitung mundur.
 
-Saat koneksi putus di lobby, pemain ditandai offline. Server menahan slot selama 30 detik, lalu melepasnya jika pemain masih offline dan room masih di fase `WAITING`. Saat ronde berjalan, pemain offline tetap tercatat. Jika host keluar atau putus koneksi, pemain online yang paling awal bergabung mengambil alih. Saat semua pemain offline, room tetap ada dan pemain online berikutnya dapat menjadi host.
+Saat koneksi putus di lobby, pemain ditandai offline. Server menahan slot selama 30 detik, lalu melepasnya jika pemain masih offline dan room masih di fase `WAITING`. Saat ronde berjalan, pemain offline tetap tercatat. Jika host keluar atau putus koneksi, pemain online yang paling awal bergabung mengambil alih.
 
-Batas reservasi lobby disimpan di memory server. Reconnect tidak memperpanjang sesi yang sudah kedaluwarsa. Room tetap tersedia saat seluruh pemain offline selama server yang sama masih berjalan; pemain lobby yang melewati reservasi dilepas dari daftar anggota.
+Room dihapus saat anggota terakhir keluar atau sesi lobby terakhir habis. Di luar lobby, jika semua anggota offline, room dihapus setelah lima menit tanpa koneksi. Resume yang berhasil membatalkan penghapusan. Batas per instance adalah 100 room tersimpan dan 30 pembuatan room per menit.
 
 ```json
 {
@@ -60,6 +60,7 @@ Batas reservasi lobby disimpan di memory server. Reconnect tidak memperpanjang s
   "hostId": 1,
   "phase": "WAITING",
   "revision": 1,
+  "serverNow": "2026-11-11T02:59:50.000Z",
   "isStarting": false,
   "players": [{ "playerId": 1, "nickname": "Ari", "online": true }]
 }
@@ -83,13 +84,13 @@ Semua aksi memerlukan callback ACK. Identitas pemain diambil dari sesi socket; j
 
 | Event | Payload | Hasil |
 | --- | --- | --- |
-| `game:start` | `{ "category": "makanan" }` | Host memulai ronde ketika 3–6 anggota online. Jika kategori tidak dikirim, gunakan `acak`. ACK sukses: `{ "ok": true, "data": { "roundId": "<uuid>" } }`. |
+| `game:start` | `{ "category": "makanan" }` | Host memulai ronde ketika 3–6 anggota online. Jika kategori tidak dikirim, gunakan `acak`. Untuk kategori sendiri, kirim `{ "category": "custom", "customCategory": "Futsal" }` dengan nama 1–50 karakter dalam satu baris. ACK sukses: `{ "ok": true, "data": { "roundId": "<uuid>" } }`. |
 | `clue:submit` | `{ "roundId": "<uuid>", "text": "Hangat" }` | Satu clue, maksimal 100 karakter, pada giliran sendiri. Kata sendiri atau bagiannya yang dipisah spasi/simbol, seperti `k o p i` dan `k.o.p.i`, ditolak. |
 | `chat:send` | `{ "roundId": "<uuid>", "text": "Menurutku Ari" }` | Pesan 1–500 karakter selama `DISCUSSION`. Riwayat menyimpan 50 pesan terakhir. |
 | `vote:submit` | `{ "roundId": "<uuid>", "targetPlayerId": 2 }` | Target memakai ID angka dari daftar peserta. Satu suara terkunci; tidak boleh memilih diri sendiri. |
 | `game:restart` | `{ "roundId": "<uuid>" }` | Host kembali dari `RESULT` ke `WAITING`, menghapus data ronde, mempertahankan kode room dan sesi anggota. |
 
-ACK sukses selain start: `{ "ok": true }`. ACK gagal mengikuti format lobby. Kode game meliputi `HOST_ONLY`, `PLAYERS_NOT_READY`, `INVALID_CATEGORY`, `ROUND_IN_PROGRESS`, `START_CANCELLED`, `INVALID_ROUND`, `NOT_A_PARTICIPANT`, `INVALID_PHASE`, `ACTION_EXPIRED`, `NOT_YOUR_TURN`, `ALREADY_SUBMITTED`, `INVALID_CLUE`, `INVALID_MESSAGE`, `ALREADY_VOTED`, `CANNOT_VOTE_SELF`, dan `INVALID_TARGET`.
+ACK sukses selain start: `{ "ok": true }`. ACK gagal mengikuti format lobby. Kode game meliputi `HOST_ONLY`, `PLAYERS_NOT_READY`, `INVALID_CATEGORY`, `INVALID_CUSTOM_CATEGORY`, `CUSTOM_CATEGORY_UNAVAILABLE`, `ROUND_IN_PROGRESS`, `START_CANCELLED`, `INVALID_ROUND`, `NOT_A_PARTICIPANT`, `INVALID_PHASE`, `ACTION_EXPIRED`, `NOT_YOUR_TURN`, `ALREADY_SUBMITTED`, `INVALID_CLUE`, `INVALID_MESSAGE`, `ALREADY_VOTED`, `CANNOT_VOTE_SELF`, dan `INVALID_TARGET`.
 
 Fase berjalan otomatis: `WAITING` → `WORD_REVEAL` (10 detik) → `CLUE` (30 detik per pemain) → `DISCUSSION` (60 detik) → `VOTING` (45 detik) → `RESULT`. Clue yang melewati waktu dicatat dengan `text: null` dan `skipped: true`. Voting selesai lebih cepat jika seluruh peserta sudah memilih. Yang belum memilih saat waktu habis dianggap abstain. Impostor kalah hanya jika menjadi satu-satunya kandidat dengan suara terbanyak.
 
@@ -131,10 +132,10 @@ Sebelum `RESULT`, kata pemain lain, identitas impostor, dan pilihan suara tidak 
 
 ### AI dan siklus ronde
 
-Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Kegagalan API, timeout lima detik, atau respons invalid memakai word bank. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
+Isi `GEMINI_API_KEY` di `server/.env` atau environment deployment. Contoh variabel tersedia di `server/.env.example`. Key tidak dikirim ke client. Model utama `gemini-3.5-flash-lite` (7 detik) diikuti model cadangan `gemini-3.1-flash-lite` (5 detik) jika gagal, timeout, atau respons tidak valid. Gunakan `GEMINI_PRIMARY_MODEL` dan `GEMINI_FALLBACK_MODEL` untuk mengganti pilihan model. Batas per instance adalah 12 panggilan Gemini per menit, termasuk panggilan ke model cadangan. Jika kedua model gagal, key belum ada, atau batas tercapai sebelum memperoleh pasangan valid, kategori bawaan memakai word bank. Untuk kategori sendiri, server mengembalikan `CUSTOM_CATEGORY_UNAVAILABLE` dan room tetap di lobby agar host bisa mencoba lagi atau memilih kategori bawaan. Kedua model Gemini yang berhasil tetap menghasilkan `source: "ai"`; client menunggu ACK `game:start` sampai 15 detik. Hash pasangan terakhir tetap disimpan di room setelah replay untuk mencegah pasangan identik, termasuk urutan terbalik.
 
 Respons AI dengan pembungkus markdown atau teks pengantar dibaca dari objek JSON-nya, lalu tetap diperiksa tipe, panjang, dan pasangan katanya. Field tambahan dari respons AI tidak diteruskan ke game state.
 
 Ronde dan deadline hanya disimpan di memory. Client memakai `room:resume` untuk menerima snapshot dan kata pribadi setelah refresh atau koneksi terputus, selama server masih berjalan. Server menolak aksi yang melewati deadline dan mengabaikan callback timer dari ronde yang sudah berubah. Jika anggota berubah saat AI sedang menyiapkan kata, start dibatalkan agar host dapat mencoba lagi.
 
-Hasil dipertahankan sampai host memilih main lagi. Replay mengosongkan state ronde lama dan mempertahankan kode room serta sesi anggota. Anggota offline kembali mengikuti reservasi lobby 30 detik. Restart server menghapus seluruh state tersebut.
+Hasil dipertahankan sampai host memilih main lagi atau room dihapus. Replay mengosongkan state ronde lama dan mempertahankan kode room serta sesi anggota. Anggota offline kembali mengikuti reservasi lobby 30 detik. Restart server menghapus seluruh state tersebut.

@@ -13,6 +13,18 @@ Game multiplayer realtime untuk 3–6 pemain. Semua pemain memberi petunjuk dan 
 ```text
 kataflase/
 ├── client/
+│   ├── __test__/
+│   ├── public/
+│   └── src/
+│       ├── components/
+│       ├── constant/
+│       ├── contexts/
+│       ├── helpers/
+│       ├── pages/
+│       ├── socket/
+│       ├── App.jsx
+│       ├── index.css
+│       └── main.jsx
 ├── docs/
 │   ├── PRD.md
 │   └── ADR.md
@@ -66,8 +78,19 @@ npm run dev
 
 Client berjalan di `http://localhost:5173` dan memakai server `http://localhost:3000`. Atur `VITE_SERVER_URL` di environment client jika URL server berbeda, serta `CLIENT_ORIGIN` di server sesuai origin client. Setup, pemeriksaan, dan kontrak integrasi dijelaskan di [README client](client/README.md).
 
-## Mulai kontribusi
+## Workflow pengembangan lanjutan
 
-1. Clone repo, lalu pindah ke branch `development`.
-2. Buat branch fitur dari `development` terbaru dengan format `fardian/nama-fitur`, `rockwell/nama-fitur`, atau `arief/nama-fitur`.
-3. Ajukan PR dari branch fitur ke `development`. Versi stabil masuk ke `main` melalui PR dari `development`.
+Perbaikan dan penambahan selanjutnya dikerjakan Rockwell di satu branch tetap: `rockwell/project-maintenance`. Gunakan kembali branch ini untuk setiap tugas; tidak perlu membuat branch baru untuk perubahan kecil.
+
+1. Kerjakan perubahan sesuai kebutuhan yang disepakati dan jalankan pemeriksaan yang relevan.
+2. Berhenti pada setiap checkpoint untuk meninjau perubahan, lalu lakukan `git add`, commit deskriptif, dan push. Skills pribadi tetap lokal.
+3. Ajukan PR dari `rockwell/project-maintenance` ke `development`. Gunakan **Create a merge commit** dan pertahankan branch tersebut setelah merge agar dapat dipakai kembali. Versi stabil masuk ke `main` melalui PR dari `development`.
+4. Sebelum tugas berikutnya, pastikan perubahan lokal sudah di-commit, lalu sinkronkan branch tetap dengan `development` terbaru:
+
+```sh
+git switch rockwell/project-maintenance
+git fetch origin
+git merge --ff-only origin/development
+```
+
+Jangan push langsung ke `main`. Kontribusi awal ketiga developer tetap tercatat dalam riwayat Git.

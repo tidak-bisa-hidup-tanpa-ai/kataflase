@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { createServer } from 'vite'
+import { build, createServer } from 'vite'
 
 let vite
 let GameContext
@@ -20,7 +20,7 @@ before(async () => {
   ;({ GameContext } = await vite.ssrLoadModule('/src/contexts/GameContext.js'))
   ;({ default: CluePhase } = await vite.ssrLoadModule('/src/components/phases/CluePhase.jsx'))
   ;({ default: VotingPhase } = await vite.ssrLoadModule('/src/components/phases/VotingPhase.jsx'))
-  ;({ default: ResultPage } = await vite.ssrLoadModule('/src/views/ResultPage.jsx'))
+  ;({ default: ResultPage } = await vite.ssrLoadModule('/src/pages/ResultPage.jsx'))
 })
 
 after(async () => {
@@ -90,4 +90,19 @@ test('hasil menampilkan kata, tally, impostor, dan abstain dari kontrak server',
   assert.match(html, />2<\/span>/)
   assert.match(html, /1 pemain abstain/)
   assert.match(html, /Main Lagi/)
+})
+
+test('build menghasilkan CSS untuk layout mobile dan desktop', async () => {
+  const { output } = await build({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    logLevel: 'silent',
+    build: { write: false },
+  })
+  const css = output
+    .filter((file) => file.type === 'asset' && file.fileName.endsWith('.css'))
+    .map((file) => String(file.source))
+    .join('\n')
+  assert.match(css, /\.flex\s*\{\s*display:\s*flex/)
+  assert.match(css, /\.px-4\s*\{/)
+  assert.match(css, /\.lg\\:grid\s*\{/)
 })

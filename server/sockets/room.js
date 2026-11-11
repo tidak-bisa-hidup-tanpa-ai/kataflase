@@ -1,7 +1,10 @@
 const { createHash, randomBytes } = require("node:crypto");
 const createGameEvents = require("./game");
+const createRateLimit = require("../helpers/rateLimit");
 
-const LOBBY_GRACE_MS = 30000;
+const LOBBY_GRACE_MS = 30_000;
+const EMPTY_ROOM_GRACE_MS = 5 * 60_000;
+const MAX_ROOMS = 100;
 
 function failure(code, message) {
   return { ok: false, error: { code, message } };
@@ -32,6 +35,7 @@ function emitRoomState(io, room) {
     hostId: room.hostId,
     phase: room.phase,
     revision: room.revision,
+    serverNow: new Date().toISOString(),
     isStarting: room.isStarting,
     players: players.map((member) => ({
       playerId: member.id,
@@ -63,6 +67,7 @@ function emitRoomState(io, room) {
 
 module.exports = (io) => {
   const rooms = new Map();
+  const allowRoomCreation = createRateLimit(30);
   let nextPlayerId = 1;
 
   function enterRoom(socket, payload, acknowledge, action) {
@@ -92,6 +97,12 @@ module.exports = (io) => {
     try {
       let room = rooms.get(code);
       if (isCreate) {
+        if (rooms.size >= MAX_ROOMS) {
+          return acknowledge(failure("ROOM_CAPACITY", "Server sedang penuh. Coba lagi nanti."));
+        }
+        if (!allowRoomCreation()) {
+          return acknowledge(failure("ROOM_CREATE_LIMIT", "Terlalu banyak room dibuat. Coba lagi sebentar."));
+        }
         let newCode;
         do {
           newCode = randomBytes(3).toString("hex").toUpperCase();
@@ -131,6 +142,8 @@ module.exports = (io) => {
       const oldSocket = isResume && getRoomSockets(io, channel)
         .find((client) => client.id !== socket.id && client.data.playerId === player.id);
       socket.join(channel);
+      clearTimeout(room.emptyTimer);
+      room.emptyTimer = null;
       socket.data.roomCode = room.code;
       socket.data.playerId = player.id;
       player.disconnectExpiresAt = null;
@@ -155,6 +168,12 @@ module.exports = (io) => {
     }
   }
 
+  function removeRoom(room) {
+    clearTimeout(room.emptyTimer);
+    game.clearRoundTimer(room.code);
+    rooms.delete(room.code);
+  }
+
   function changePresence(code, playerId, action) {
     const room = rooms.get(code);
     const player = room?.players.find((member) => member.id === playerId);
@@ -172,6 +191,15 @@ module.exports = (io) => {
       if (player.disconnectExpiresAt) scheduleExpiry(code, playerId, player.disconnectExpiresAt);
     } else {
       room.players = room.players.filter((member) => member.id !== playerId);
+    }
+    if (!room.players.length) {
+      removeRoom(room);
+      return;
+    }
+    if (!onlineIds.size && room.phase !== "WAITING" && !room.emptyTimer) {
+      room.emptyTimer = setTimeout(() => {
+        if (rooms.get(code) === room && !getOnlinePlayerIds(io, `room:${code}`).size) removeRoom(room);
+      }, EMPTY_ROOM_GRACE_MS).unref();
     }
     if (room.hostId === playerId || room.hostId === null) {
       room.hostId = room.players.find((member) => onlineIds.has(member.id))?.id ?? null;

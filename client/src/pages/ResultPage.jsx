@@ -6,7 +6,7 @@ import { PHASES } from '../constant/game'
 import { useGame } from '../contexts/GameContext'
 import { playerName } from '../helpers/room'
 import { toast } from '../helpers/toast'
-import { useLeaveRoom } from '../helpers/useLeaveRoom'
+import LeaveRoomButton from '../components/room/LeaveRoomButton'
 
 function defaultReason(result, room) {
   const impostor = playerName(room, result.impostorId)
@@ -25,7 +25,6 @@ function majorityWord(rows, impostorId) {
 
 function ResultView() {
   const { room, playerId, isHost, restartGame, canAct } = useGame()
-  const leave = useLeaveRoom()
   const [busy, setBusy] = useState(false)
 
   if (room.phase !== PHASES.RESULT) {
@@ -141,13 +140,9 @@ function ResultView() {
         <p className="mt-2 text-center font-mono text-[10px] text-muted">
           Kode room dan anggota tetap sama.
         </p>
-        <button
-          type="button"
-          className="mt-4 w-full text-center text-sm text-muted underline underline-offset-2"
-          onClick={leave}
-        >
+        <LeaveRoomButton className="mt-4 w-full text-center text-sm text-muted underline underline-offset-2">
           Keluar dari room
-        </button>
+        </LeaveRoomButton>
       </div>
       </section>
       </div>

@@ -16,7 +16,7 @@ Mengikuti arahan instructor, MVP tidak menggunakan database. Tim menerima bahwa 
 
 | Bagian          | Pilihan MVP                                                                                                                                                                                                                                                                         |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Client**      | SPA Vite + React. Rute `/` untuk Home, `/rooms/:code` untuk lobby dan ronde, serta `/rooms/:code/result` untuk hasil. Satu `GameContext` menangani sesi, koneksi, snapshot publik, dan state pribadi. Fase server menentukan tampilan aktif, termasuk saat halaman dibuka langsung. |
+| **Client**      | SPA Vite + React. Rute `/` untuk Home, `/rooms/:code` untuk lobby dan ronde, serta `/rooms/:code/result` untuk hasil. `ThemeContext` menangani preferensi tema lokal. Redux menyimpan snapshot publik room. `GameProvider` menangani sesi, koneksi, dan state pribadi; komponen tetap dapat memakai `useGame()`. Fase server menentukan tampilan aktif, termasuk saat halaman dibuka langsung. |
 | **Server**      | Satu proses Node.js menjalankan Express dan Socket.IO. Server memeriksa keanggotaan room, memvalidasi aksi, menyimpan state, menjalankan timer, membagikan kata, dan menetapkan hasil.                                                                                              |
 | **Penyimpanan** | Satu `Map` di memory proses Node.js menyimpan room, pemain, sesi, dan ronde aktif. Gunakan satu instance server. Restart, crash, atau redeploy menghapus seluruh state; kode dan sesi lama tidak berlaku. |
 | **HTTP**        | `GET /api/game-options` menyajikan kategori untuk pemilih di lobby. `GET /health` dipakai untuk memeriksa layanan. Dokumentasikan respons HTTP dan contoh payload socket.                                                                                                           |
@@ -31,6 +31,8 @@ Mengikuti arahan instructor, MVP tidak menggunakan database. Tim menerima bahwa 
 - **Fase dan waktu.** Server menyimpan `deadlineAt` di memory dan mengirimkannya untuk hitung mundur di browser. Sebelum memproses aksi atau callback timer, periksa `roundId`, fase, dan giliran yang masih aktif. Saat batas voting terlewati, tolak suara baru meskipun callback timer belum berjalan. Startup selalu dimulai dengan daftar room kosong.
 - **Voting.** Daftar peserta dikunci saat ronde dimulai. Simpan suara dengan `playerId` sebagai kunci. Validasi, pencatatan suara, dan perubahan ke `RESULT` dilakukan secara sinkron dalam satu proses tanpa `await` di antaranya. Timer dan suara terakhir hanya bisa menutup satu hasil untuk ronde yang sama. Kirim pembaruan socket setelah state diperbarui.
 - **Replay.** Pertahankan hasil selama fase `RESULT`. Saat host mengirim `game:restart` untuk `roundId` yang aktif, kosongkan state ronde lama, batalkan timer-nya, dan kembalikan room ke `WAITING`. Kode room, anggota, dan sesi tetap berlaku. Simpan hash pasangan kata terakhir di room untuk mencegah pengulangan langsung. Ronde baru mendapat `roundId` baru.
+
+- **Room kosong.** Room dihapus ketika tidak ada anggota yang tersisa. Di luar lobby, room dihapus setelah semua anggota offline selama lima menit. **Main Lagi** mempertahankan room dan sesi yang masih berlaku.
 
 ## Data dan batas akses
 
@@ -62,10 +64,10 @@ Simpan token di `sessionStorage` per tab. Saat reconnect atau refresh selama ser
 
 ## Integrasi AI
 
-1. Validasi kategori dari pilihan yang didukung. Jika host memilih acak, server memilih kategori sebelum memanggil provider.
-2. Minta pasangan kata dalam bahasa Indonesia dengan keluaran terstruktur `wordA` dan `wordB`. Tetapkan timeout awal lima detik.
+1. Validasi kategori bawaan atau nama kategori sendiri sepanjang 1–50 karakter dalam satu baris. Jika host memilih acak, server memilih kategori bawaan sebelum memanggil provider.
+2. Minta pasangan kata dalam bahasa Indonesia dengan keluaran terstruktur `wordA` dan `wordB`. Model utama mendapat waktu tujuh detik dan model cadangan lima detik. Client menunggu ACK `game:start` hingga 15 detik.
 3. Periksa dua nilai teks yang pendek dan tidak kosong. Tolak kata yang identik setelah normalisasi. Bandingkan hash dari pasangan yang dinormalisasi dan diurutkan dengan hash ronde terakhir, sehingga urutan terbalik juga terdeteksi.
-4. Gunakan word bank jika provider gagal, timeout, atau respons tidak lolos. Pilih pasangan berbeda dari ronde terakhir, lalu acak satu impostor dan bagikan kata.
+4. Coba model cadangan jika model utama gagal, timeout, atau respons tidak lolos. Gunakan word bank untuk kategori bawaan jika kedua model gagal atau key tidak tersedia. Untuk kategori sendiri, pertahankan room di lobby agar host bisa mencoba lagi atau memilih kategori bawaan. Pilih pasangan berbeda dari ronde terakhir, lalu acak satu impostor dan bagikan kata.
 
 Validasi struktur dilakukan otomatis. Kelayakan makna dan kualitas petunjuk dinilai lewat playtest. Uji jalur AI sukses dan fallback sebelum demo publik.
 
@@ -79,4 +81,4 @@ Validasi struktur dilakukan otomatis. Kelayakan makna dan kualitas petunjuk dini
 
 Pertahankan folder `client/` dan `server/`. Developer 1 memiliki tampilan dan Context. Developer 2 memiliki transport, sesi, dan penyusunan payload. Developer 3 memiliki aturan ronde dan AI. Sepakati contoh `room:state` dan `player:state` sebelum menyambungkan pekerjaan.
 
-**Masih terbuka.** Provider dan hosting spesifik mengikuti akses tim. Cakupan endpoint REST dikonfirmasi ke instructor. Durasi timer bisa disesuaikan setelah playtest dan dicatat di PRD. Kebijakan retensi untuk room yang ditinggalkan perlu diputuskan terpisah dari **Main Lagi**.
+**Masih terbuka.** Provider dan hosting spesifik mengikuti akses tim. Cakupan endpoint REST dikonfirmasi ke instructor. Durasi timer bisa disesuaikan setelah playtest dan dicatat di PRD.

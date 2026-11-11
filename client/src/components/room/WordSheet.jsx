@@ -1,12 +1,10 @@
 import { useEffect } from 'react'
-import { useLeaveRoom } from '../../helpers/useLeaveRoom'
+import LeaveRoomButton from './LeaveRoomButton'
 import { EyeOffIcon } from '../ui/Icons'
 import WordCard from './WordCard'
 
 // Dibuka dari tombol "Lihat kata" selama ronde.
 export default function WordSheet({ open, onClose }) {
-  const leave = useLeaveRoom()
-
   useEffect(() => {
     if (!open) return undefined
     function onKey(event) {
@@ -20,7 +18,7 @@ export default function WordSheet({ open, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-ink/60 p-4 sm:items-center"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-scrim/60 p-4 sm:items-center"
       onClick={onClose}
     >
       <div
@@ -34,13 +32,9 @@ export default function WordSheet({ open, onClose }) {
         <button type="button" className="btn btn-outline mt-10 w-full" onClick={onClose}>
           <EyeOffIcon /> Sembunyikan kartu
         </button>
-        <button
-          type="button"
-          className="mt-4 w-full text-center text-sm text-muted underline underline-offset-2"
-          onClick={leave}
-        >
+        <LeaveRoomButton className="mt-4 w-full text-center text-sm text-muted underline underline-offset-2">
           Keluar dari room
-        </button>
+        </LeaveRoomButton>
       </div>
     </div>
   )
