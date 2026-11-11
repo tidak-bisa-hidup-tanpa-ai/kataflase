@@ -16,6 +16,19 @@
   --color-cobalt: #3d5bf2;
   --color-mint: #79d2ad;
   --color-tangerine: #f59e5b;
+
+  /* Maskot bergoyang pelan */
+  --animate-bob: bob 3.2s ease-in-out infinite;
+
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-4px) rotate(-1.5deg);
+    }
+  }
 }
 
 @layer base {
@@ -51,7 +64,7 @@
   }
 
   .btn {
-    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-ink px-4 font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cobalt enabled:active:translate-x-[2px] enabled:active:translate-y-[2px] enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-ink px-4 font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cobalt enabled:active:translate-x-0.5 enabled:active:translate-y-0.5 enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-ink {
@@ -71,7 +84,7 @@
   }
 
   .pill {
-    @apply inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-card px-3 py-1.5 font-mono text-[11px] font-medium tracking-[0.1em] text-ink uppercase;
+    @apply inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-card px-3 py-1.5 font-mono text-[11px] font-medium tracking-widest text-ink uppercase;
   }
 
   .input {
