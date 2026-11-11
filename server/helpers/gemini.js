@@ -233,7 +233,16 @@ async function callGeminiHint({ name, timeout }, secretWord, category) {
     throw new Error("AI_INVALID_HINT: Teks hint kosong atau bukan string.");
   }
 
-  return parsed.hint.trim();
+  const hint = parsed.hint.trim();
+  const normalize = (value) => value.normalize("NFKC").toLocaleLowerCase("id-ID");
+  const normalizedHint = normalize(hint);
+  const secretParts = normalize(secretWord).match(/[\p{L}\p{N}]+/gu) || [];
+  const hintParts = normalizedHint.match(/[\p{L}\p{N}]+/gu) || [];
+  if (secretParts.some((part) => hintParts.includes(part))) {
+    throw new Error("AI_HINT_LEAK: Hint mengandung kata rahasia.");
+  }
+
+  return hint;
 }
 
 /**
