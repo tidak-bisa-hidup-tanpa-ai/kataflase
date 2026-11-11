@@ -7,6 +7,7 @@ import { toast } from '../../helpers/toast'
 import ClueList from '../room/ClueList'
 import PhaseBar from '../room/PhaseBar'
 import Avatar from '../ui/Avatar'
+import Mascot from '../ui/Mascot'
 
 export default function CluePhase() {
   const { room, playerId, myWord, submitClue, canAct } = useGame()
@@ -76,7 +77,8 @@ export default function CluePhase() {
       <h2 className="label mt-6">Petunjuk masuk</h2>
       <ClueList variant="list" />
       {isParticipant && !submitted.has(playerId) && (
-        <p className="mt-2 rounded-xl border-2 border-dashed border-ink/50 py-3 text-center font-mono text-[11px] text-muted">
+        <p className="mt-2 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink/50 py-2 text-center font-mono text-[11px] text-muted">
+          <Mascot mood={isMyTurn ? 'happy' : 'peek'} className="w-10" />
           {isMyTurn ? 'Petunjukmu muncul di sini' : 'Tunggu giliranmu'}
         </p>
       )}

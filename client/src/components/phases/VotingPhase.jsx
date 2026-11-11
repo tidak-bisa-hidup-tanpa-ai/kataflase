@@ -7,6 +7,7 @@ import ClueList from '../room/ClueList'
 import PhaseBar from '../room/PhaseBar'
 import Avatar from '../ui/Avatar'
 import { CheckIcon } from '../ui/Icons'
+import Mascot from '../ui/Mascot'
 
 export default function VotingPhase() {
   const { room, playerId, hasVoted, submitVote, canAct } = useGame()
@@ -64,7 +65,10 @@ export default function VotingPhase() {
         </p>
       ) : (
         <>
-          <h2 className="label mt-6">Siapa impostornya?</h2>
+          <div className="mt-4 flex items-end justify-between gap-3">
+            <h2 className="label pb-1">Siapa impostornya?</h2>
+            <Mascot mood={voted ? 'happy' : 'panic'} className="w-14 shrink-0 motion-safe:animate-bob" />
+          </div>
           <ul className="mt-2 space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0" role="radiogroup" aria-label="Kandidat impostor">
             {candidates.map((id) => {
               const active = chosen === id
